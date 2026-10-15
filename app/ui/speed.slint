@@ -1,0 +1,224 @@
+import { Theme } from "@prism/theme.slint";
+import { Icons } from "@prism/icons.slint";
+import { Button, ButtonKind, Card, Icon, Label, PageHeader } from "@prism/controls.slint";
+import { Select } from "@prism/overlays.slint";
+import { App } from "globals.slint";
+
+component Stage inherits VerticalLayout {
+    in property <int> index;
+    in property <string> label;
+    property <bool> done: App.speed-step == 3 || self.index < App.speed-step;
+    property <bool> active: self.index == App.speed-step && App.speed-running;
+    spacing: 6px;
+    horizontal-stretch: 1;
+    Rectangle {
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.muted;
+        Rectangle {
+            x: 0px;
+            width: parent.width * (root.done ? 1 : root.active ? App.speed-progress : 0);
+            border-radius: 2px;
+            background: Theme.series-down;
+            animate width { duration: 300ms; }
+        }
+    }
+    Label {
+        text: root.label;
+        font-size: 12px;
+        line-height: 16px;
+        color: root.done || root.active ? Theme.foreground : Theme.subtle-foreground;
+    }
+}
+
+component Metric inherits Card {
+    in property <image> icon;
+    in property <string> label;
+    in property <string> value;
+    in property <string> unit;
+    in property <bool> active;
+    border-color: self.active ? Theme.border-strong : Theme.border;
+    VerticalLayout {
+        padding: 16px;
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            VerticalLayout {
+                alignment: center;
+                Icon { source: root.icon; width: 14px; height: 14px; colorize: Theme.muted-foreground; }
+            }
+            Label { text: root.label; font-size: 12px; line-height: 16px; font-weight: 500; color: Theme.muted-foreground; }
+        }
+        HorizontalLayout {
+            padding-top: 4px;
+            spacing: 4px;
+            alignment: start;
+            Label {
+                text: root.value;
+                tabular: true;
+                font-size: 24px;
+                line-height: 32px;
+                font-weight: 600;
+                letter-spacing: -0.6px;
+            }
+            VerticalLayout {
+                alignment: start;
+                padding-top: 9.6px;
+                Label {
+                    text: root.unit;
+                    line-height: 20px;
+                    color: Theme.subtle-foreground;
+                }
+            }
+        }
+    }
+}
+
+component HistoryRow inherits Rectangle {
+    in property <string> at;
+    in property <string> server;
+    in property <string> down;
+    in property <string> up;
+    in property <string> ping;
+    in property <bool> head;
+    in property <bool> divider: true;
+    property <color> fg: root.head ? Theme.subtle-foreground : Theme.foreground;
+    property <length> size: root.head ? 12px : 13px;
+    property <int> weight: root.head ? 500 : 400;
+    if root.divider: Rectangle { y: 0px; height: 1px; background: Theme.border; }
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 20px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 8px;
+        Label { width: 128px; text: root.at; tabular: !root.head; font-size: root.size; font-weight: root.weight; color: root.head ? Theme.subtle-foreground : Theme.muted-foreground; }
+        Label { horizontal-stretch: 1; max-width: 192px; text: root.server; font-size: root.size; font-weight: root.weight; color: root.fg; overflow: elide; }
+        Rectangle { horizontal-stretch: 1; }
+        Label { width: 120px; text: root.down; tabular: !root.head; horizontal-alignment: right; font-size: root.size; font-weight: root.weight; color: root.fg; }
+        Label { width: 120px; text: root.up; tabular: !root.head; horizontal-alignment: right; font-size: root.size; font-weight: root.weight; color: root.fg; }
+        Label { width: 84px; text: root.ping; tabular: !root.head; horizontal-alignment: right; font-size: root.size; font-weight: root.weight; color: root.fg; }
+    }
+}
+
+export component SpeedPage inherits VerticalLayout {
+    alignment: start;
+    PageHeader {
+        title: "Тест скорости";
+        description: "Замер через VPN-сервер: задержка, загрузка и отдача";
+    }
+    Card {
+        HorizontalLayout {
+            padding: 24px;
+            spacing: 32px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                Label {
+                    text: App.speed-hero-label;
+                    font-weight: 500;
+                    line-height: 20px;
+                    color: Theme.muted-foreground;
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    Label {
+                        text: App.speed-hero;
+                        tabular: true;
+                        font-size: 56px;
+                        line-height: 70px;
+                        font-weight: 600;
+                        letter-spacing: -1.4px;
+                    }
+                    VerticalLayout {
+                        alignment: start;
+                        padding-top: 34.8px;
+                        Label { text: "Мбит/с"; font-size: 18px; line-height: 28px; color: Theme.subtle-foreground; }
+                    }
+                }
+                HorizontalLayout {
+                    padding-top: 12px;
+                    spacing: 8px;
+                    Stage { index: 0; label: "Задержка"; }
+                    Stage { index: 1; label: "Загрузка"; }
+                    Stage { index: 2; label: "Отдача"; }
+                }
+            }
+            VerticalLayout {
+                width: 240px;
+                spacing: 12px;
+                alignment: center;
+                Select {
+                    label: "Сервер для теста";
+                    width: 240px;
+                    options: App.speed-targets;
+                    value: App.speed-target;
+                    changed(v) => { App.speed-select(v); }
+                }
+                if App.speed-running: Button {
+                    width: 240px;
+                    kind: ButtonKind.outline;
+                    text: "Остановить";
+                    icon: Icons.square;
+                    clicked => { App.speed-cancel(); }
+                }
+                if !App.speed-running: Button {
+                    width: 240px;
+                    kind: ButtonKind.primary;
+                    text: App.speed-step == 3 ? "Проверить ещё раз" : "Начать тест";
+                    icon: Icons.play;
+                    enabled: App.speed-targets.length > 0;
+                    clicked => { App.speed-start(); }
+                }
+            }
+        }
+    }
+    HorizontalLayout {
+        padding-top: 16px;
+        spacing: 12px;
+        Metric { horizontal-stretch: 1; icon: Icons.arrow-down; label: "Загрузка"; value: App.speed-down; unit: "Мбит/с"; active: App.speed-step == 1 && App.speed-running; }
+        Metric { horizontal-stretch: 1; icon: Icons.arrow-up; label: "Отдача"; value: App.speed-up; unit: "Мбит/с"; active: App.speed-step == 2 && App.speed-running; }
+        Metric { horizontal-stretch: 1; icon: Icons.timer; label: "Задержка"; value: App.speed-ping; unit: "мс"; active: App.speed-step == 0 && App.speed-running; }
+        Metric { horizontal-stretch: 1; icon: Icons.waves; label: "Джиттер"; value: App.speed-jitter; unit: "мс"; }
+    }
+    Rectangle { height: 16px; }
+    Card {
+        VerticalLayout {
+            HorizontalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                padding-top: 12px;
+                padding-bottom: 12px;
+                Label { text: "История"; font-weight: 600; line-height: 20px; }
+            }
+            if App.speed-history.length > 0: VerticalLayout {
+                Rectangle { height: 1px; background: Theme.border; }
+                HistoryRow { head: true; divider: false; at: "Когда"; server: "Сервер"; down: "Загрузка"; up: "Отдача"; ping: "Задержка"; }
+                for r in App.speed-history: HistoryRow {
+                    at: r.at;
+                    server: r.server;
+                    down: r.down;
+                    up: r.up;
+                    ping: r.ping;
+                }
+            }
+            if App.speed-history.length == 0: VerticalLayout {
+                Rectangle { height: 1px; background: Theme.border; }
+                HorizontalLayout {
+                    padding-left: 20px;
+                    padding-right: 20px;
+                    padding-top: 24px;
+                    padding-bottom: 24px;
+                    spacing: 8px;
+                    alignment: start;
+                    VerticalLayout {
+                        alignment: center;
+                        Icon { source: Icons.gauge; colorize: Theme.muted-foreground; }
+                    }
+                    Label { text: "Здесь появятся результаты тестов"; line-height: 20px; color: Theme.muted-foreground; }
+                }
+            }
+        }
+    }
+}

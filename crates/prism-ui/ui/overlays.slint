@@ -1,0 +1,334 @@
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Icon, Button, ButtonKind, Label } from "controls.slint";
+export { Tip, TipLayer, TipState } from "tip.slint";
+
+export component PopShadow inherits Rectangle {
+    in property <length> radius: 8px;
+    in property <color> tint: Theme.shadow-color;
+    in property <float> strength: Theme.shadow-strength;
+    for i in 6: Rectangle {
+        x: -(i + 1) * 4px;
+        y: 8px - (i + 1) * 4px;
+        width: root.width + (i + 1) * 8px;
+        height: root.height + (i + 1) * 8px;
+        border-radius: root.radius + (i + 1) * 4px;
+        background: root.tint.with-alpha(root.strength * (0.34 - i * 0.05));
+    }
+}
+
+export component Surface inherits Rectangle {
+    in property <length> radius: 8px;
+    PopShadow { width: 100%; height: 100%; radius: root.radius; }
+    Rectangle {
+        background: Theme.card;
+        border-radius: root.radius;
+        border-width: 1px;
+        border-color: Theme.border;
+    }
+    @children
+}
+
+export struct MenuEntry {
+    label: string,
+    icon: image,
+    danger: bool,
+    separator: bool,
+    disabled: bool,
+}
+
+export component PopupMenu inherits PopupWindow {
+    in property <[MenuEntry]> entries;
+    callback selected(int);
+    width: max(192px, layout.preferred-width);
+    height: layout.preferred-height;
+
+    Surface {
+        layout := VerticalLayout {
+            padding: 5px;
+            for entry[i] in root.entries: Rectangle {
+                height: entry.separator ? 9px : 32px;
+                if entry.separator: Rectangle {
+                    y: 4px;
+                    height: 1px;
+                    background: Theme.border;
+                }
+                if !entry.separator: Rectangle {
+                    accessible-role: list-item;
+                    accessible-label: entry.label;
+                    accessible-action-default => {
+                        root.selected(i);
+                        root.close();
+                    }
+                    border-radius: 6px;
+                    background: item-touch.has-hover && !entry.disabled ? Theme.hover : transparent;
+                    opacity: entry.disabled ? 0.5 : 1;
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 8px;
+                        if entry.icon.width > 0: VerticalLayout {
+                            alignment: center;
+                            Icon {
+                                source: entry.icon;
+                                colorize: entry.danger ? Theme.destructive : Theme.foreground;
+                            }
+                        }
+                        Text {
+                            text: entry.label;
+                            vertical-alignment: center;
+                            font-size: 14px;
+                            color: entry.danger ? Theme.destructive : Theme.foreground;
+                        }
+                    }
+                    item-touch := TouchArea {
+                        enabled: !entry.disabled;
+                        mouse-cursor: MouseCursor.pointer;
+                        clicked => { root.selected(i); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export struct Option {
+    value: string,
+    label: string,
+}
+
+export component Select inherits Rectangle {
+    in property <[Option]> options;
+    in property <string> value;
+    in property <bool> small;
+    in property <length> min-w: 160px;
+    in property <string> label;
+    callback changed(string);
+
+    height: root.small ? 32px : 36px;
+    min-width: root.min-w;
+    horizontal-stretch: 0;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: Theme.border-strong;
+    background: touch.has-hover ? Theme.card-hover : Theme.card;
+    accessible-role: combobox;
+    accessible-label: root.label;
+    accessible-value: root.value;
+    accessible-expandable: true;
+    accessible-expanded: popup.is-open;
+    accessible-action-default => { popup.show(); }
+    accessible-action-expand => { popup.show(); }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        for o in root.options: HorizontalLayout {
+            horizontal-stretch: 0;
+            if o.value == root.value: Text {
+                text: o.label;
+                vertical-alignment: center;
+                font-size: root.small ? 13px : 14px;
+                color: Theme.foreground;
+                overflow: elide;
+            }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        VerticalLayout {
+            alignment: center;
+            padding-left: 8px;
+            Icon { source: Icons.chevron-down; colorize: Theme.muted-foreground; }
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => { popup.show(); }
+    }
+    popup := PopupWindow {
+        x: 0px;
+        y: root.height + 6px;
+        width: max(root.width, list.preferred-width);
+        height: min(320px, list.preferred-height);
+        Surface {
+            Flickable {
+                content-height: list.preferred-height;
+                list := VerticalLayout {
+                    padding: 5px;
+                    for o in root.options: Rectangle {
+                        accessible-role: list-item;
+                        accessible-label: o.label;
+                        accessible-item-selectable: true;
+                        accessible-item-selected: o.value == root.value;
+                        accessible-action-default => {
+                            root.changed(o.value);
+                            popup.close();
+                        }
+                        height: 32px;
+                        border-radius: 6px;
+                        background: opt-touch.has-hover ? Theme.hover : transparent;
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 32px;
+                            Text {
+                                text: o.label;
+                                vertical-alignment: center;
+                                font-size: 14px;
+                                color: Theme.foreground;
+                            }
+                        }
+                        if o.value == root.value: Icon {
+                            x: parent.width - 24px;
+                            source: Icons.check;
+                            colorize: Theme.accent;
+                        }
+                        opt-touch := TouchArea {
+                            mouse-cursor: MouseCursor.pointer;
+                            clicked => { root.changed(o.value); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component Dialog inherits Rectangle {
+    in property <string> title;
+    in property <string> description;
+    in property <bool> focus-self: true;
+    callback close();
+    property <float> shown: 0;
+    init => {
+        self.shown = 1;
+        if self.focus-self {
+            scope.focus();
+        }
+    }
+    animate shown { duration: 180ms; easing: cubic-bezier(0.2, 0.8, 0.3, 1); }
+
+    background: #000000.with-alpha(0.4 * root.shown);
+    TouchArea {
+        clicked => { root.close(); }
+    }
+    scope := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape {
+                root.close();
+                return accept;
+            }
+            reject
+        }
+        card := Surface {
+            radius: 12px;
+            width: min(480px, root.width - 32px);
+            height: body.preferred-height;
+            x: (root.width - self.width) / 2;
+            y: (root.height - self.height) / 2 + (1 - root.shown) * 6px;
+            opacity: root.shown;
+            TouchArea { }
+            body := VerticalLayout {
+                padding: 25px;
+                VerticalLayout {
+                    padding-bottom: 16px;
+                    padding-right: 32px;
+                    Label {
+                        text: root.title;
+                        font-size: 16px;
+                        line-height: 24px;
+                        font-weight: 600;
+                        wrap: word-wrap;
+                    }
+                    if root.description != "": Rectangle { height: 4px; }
+                    if root.description != "": Label {
+                        text: root.description;
+                        line-height: 20px;
+                        color: Theme.muted-foreground;
+                        wrap: word-wrap;
+                    }
+                }
+                @children
+            }
+            Rectangle {
+                x: parent.width - 25px - self.width + 8px;
+                y: 21px;
+                width: 28px;
+                height: 28px;
+                border-radius: 6px;
+                background: close-touch.has-hover ? Theme.hover : transparent;
+                accessible-role: button;
+                accessible-label: "Закрыть";
+                Icon {
+                    source: Icons.x;
+                    colorize: close-touch.has-hover ? Theme.foreground : Theme.muted-foreground;
+                }
+                close-touch := TouchArea {
+                    mouse-cursor: MouseCursor.pointer;
+                    clicked => { root.close(); }
+                }
+            }
+        }
+    }
+}
+
+export struct ToastData {
+    id: int,
+    kind: int,
+    text: string,
+}
+
+export component ToastLayer inherits Rectangle {
+    in property <[ToastData]> toasts;
+    callback dismiss(int);
+    VerticalLayout {
+        x: root.width - 320px - 16px;
+        y: root.height - self.preferred-height - 16px;
+        width: 320px;
+        spacing: 8px;
+        for toast in root.toasts: Surface {
+            property <float> shown: 0;
+            init => { self.shown = 1; }
+            animate shown { duration: 180ms; easing: cubic-bezier(0.2, 0.8, 0.3, 1); }
+            opacity: self.shown;
+            height: row.preferred-height;
+            TouchArea { }
+            row := HorizontalLayout {
+                padding: 13px;
+                spacing: 10px;
+                VerticalLayout {
+                    alignment: start;
+                    padding-top: 2px;
+                    Icon {
+                        source: toast.kind == 0 ? Icons.circle-check : toast.kind == 1 ? Icons.circle-alert : Icons.info;
+                        colorize: toast.kind == 0 ? Theme.accent : toast.kind == 1 ? Theme.destructive : Theme.muted-foreground;
+                    }
+                }
+                Text {
+                    horizontal-stretch: 1;
+                    text: toast.text;
+                    wrap: word-wrap;
+                    font-size: 14px;
+                    color: Theme.foreground;
+                }
+                VerticalLayout {
+                    alignment: start;
+                    Rectangle {
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 4px;
+                        background: close.has-hover ? Theme.hover : transparent;
+                        Icon {
+                            width: 14px;
+                            height: 14px;
+                            source: Icons.x;
+                            colorize: close.has-hover ? Theme.foreground : Theme.subtle-foreground;
+                        }
+                        close := TouchArea {
+                            mouse-cursor: MouseCursor.pointer;
+                            clicked => { root.dismiss(toast.id); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

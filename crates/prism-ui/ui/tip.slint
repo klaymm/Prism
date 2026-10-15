@@ -1,0 +1,70 @@
+import { Theme } from "theme.slint";
+
+export global TipState {
+    in-out property <string> text;
+    in-out property <bool> mono;
+    in-out property <bool> visible;
+    in-out property <length> anchor-x;
+    in-out property <length> anchor-y;
+    in-out property <length> anchor-height;
+    in-out property <int> owner;
+    in-out property <int> next-owner: 1;
+}
+
+export component Tip inherits TouchArea {
+    in property <string> tip;
+    in property <bool> mono;
+    property <int> id;
+    init => {
+        self.id = TipState.next-owner;
+        TipState.next-owner += 1;
+    }
+    Timer {
+        interval: 350ms;
+        running: root.has-hover && root.tip != "" && !(TipState.visible && TipState.owner == root.id);
+        triggered => {
+            TipState.text = root.tip;
+            TipState.mono = root.mono;
+            TipState.anchor-x = root.absolute-position.x + root.width / 2;
+            TipState.anchor-y = root.absolute-position.y;
+            TipState.anchor-height = root.height;
+            TipState.owner = root.id;
+            TipState.visible = true;
+        }
+    }
+    changed has-hover => {
+        if !self.has-hover && TipState.owner == self.id {
+            TipState.visible = false;
+        }
+    }
+    HorizontalLayout {
+        @children
+    }
+}
+
+export component TipLayer inherits Rectangle {
+    if TipState.visible: Rectangle {
+        property <float> shown: 0;
+        init => { self.shown = 1; }
+        animate shown { duration: 160ms; }
+        width: min(288px, label.preferred-width + 20px);
+        height: label.preferred-height + 12px;
+        x: clamp(TipState.anchor-x - self.width / 2, 8px, root.width - self.width - 8px);
+        y: TipState.anchor-y < self.height + 12px
+            ? TipState.anchor-y + TipState.anchor-height + 6px
+            : TipState.anchor-y - self.height - 6px;
+        border-radius: 6px;
+        background: Theme.foreground;
+        opacity: self.shown;
+        label := Text {
+            x: 10px;
+            y: 6px;
+            width: parent.width - 20px;
+            text: TipState.text;
+            wrap: word-wrap;
+            font-size: 12px;
+            font-family: TipState.mono ? Theme.mono : Theme.sans;
+            color: Theme.background;
+        }
+    }
+}

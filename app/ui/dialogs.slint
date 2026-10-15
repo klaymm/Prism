@@ -1,0 +1,162 @@
+import { Theme } from "@prism/theme.slint";
+import { Icons } from "@prism/icons.slint";
+import { Button, ButtonKind, Icon, Label, TextArea, TextField } from "@prism/controls.slint";
+import { Dialog } from "@prism/overlays.slint";
+import { App } from "globals.slint";
+
+export component ImportDialog inherits Dialog {
+    title: "Добавить подписку или сервер";
+    description: "Ссылка на подписку (https://…) или одна либо несколько ссылок vless://";
+    close => { App.import-open = false; }
+    focus-self: false;
+    init => { field.focus-input(); }
+
+    VerticalLayout {
+        spacing: 12px;
+        field := TextArea {
+            height: 96px;
+            text <=> App.import-text;
+            placeholder: "https://sub.example.com/…";
+            invalid: App.import-error != "";
+            submit => {
+                if !App.import-busy {
+                    App.import-submit(self.text);
+                }
+            }
+        }
+        if App.import-error != "": Label {
+            text: App.import-error;
+            wrap: word-wrap;
+            line-height: 20px;
+            color: Theme.destructive;
+        }
+        HorizontalLayout {
+            padding-top: 4px;
+            Button {
+                kind: ButtonKind.outline;
+                text: "Вставить из буфера";
+                icon: Icons.clipboard-paste;
+                enabled: !App.import-busy;
+                clicked => { App.import-paste(); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Button {
+                kind: ButtonKind.primary;
+                text: "Добавить";
+                loading: App.import-busy;
+                enabled: field.text != "";
+                clicked => { App.import-submit(field.text); }
+            }
+        }
+    }
+}
+
+export component ElevationDialog inherits Dialog {
+    title: "Нужны права администратора";
+    description: "Режим TUN создаёт виртуальный сетевой адаптер и пропускает через VPN весь трафик — включая игры и приложения, которые не умеют работать с прокси.";
+    close => { App.elevation-open = false; }
+
+    VerticalLayout {
+        spacing: 20px;
+        Rectangle {
+            border-radius: 8px;
+            background: Theme.warning-soft;
+            HorizontalLayout {
+                padding: 12px;
+                spacing: 12px;
+                VerticalLayout {
+                    alignment: start;
+                    padding-top: 2px;
+                    Icon { source: Icons.shield-alert; colorize: Theme.warning; }
+                }
+                Label {
+                    horizontal-stretch: 1;
+                    text: "Приложение перезапустится с правами администратора. Windows покажет запрос контроля учётных записей.";
+                    wrap: word-wrap;
+                    line-height: 20px;
+                }
+            }
+        }
+        HorizontalLayout {
+            alignment: end;
+            spacing: 8px;
+            Button {
+                kind: ButtonKind.ghost;
+                text: "Отмена";
+                clicked => { App.elevation-open = false; }
+            }
+            Button {
+                kind: ButtonKind.primary;
+                text: "Перезапустить";
+                loading: App.elevation-busy;
+                clicked => { App.restart-as-admin(); }
+            }
+        }
+    }
+}
+
+export component RenameDialog inherits Dialog {
+    title: "Переименовать подписку";
+    close => { App.sub-dialog = ""; }
+    focus-self: false;
+    init => {
+        field.text = App.sub-dialog-name;
+        field.focus-input();
+    }
+    VerticalLayout {
+        spacing: 16px;
+        VerticalLayout {
+            spacing: 6px;
+            Label { text: "Название"; font-weight: 500; line-height: 20px; }
+            field := TextField {
+                accepted(t) => {
+                    if t != "" {
+                        App.rename-subscription(App.sub-dialog-id, t);
+                        App.sub-dialog = "";
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            alignment: end;
+            spacing: 8px;
+            Button {
+                kind: ButtonKind.ghost;
+                text: "Отмена";
+                clicked => { App.sub-dialog = ""; }
+            }
+            Button {
+                kind: ButtonKind.primary;
+                text: "Сохранить";
+                enabled: field.text != "";
+                clicked => {
+                    App.rename-subscription(App.sub-dialog-id, field.text);
+                    App.sub-dialog = "";
+                }
+            }
+        }
+    }
+}
+
+export component RemoveSubscriptionDialog inherits Dialog {
+    title: "Удалить подписку?";
+    description: "«" + App.sub-dialog-name + "» и все её серверы будут удалены. Подписку можно будет добавить снова по ссылке.";
+    close => { App.sub-dialog = ""; }
+    HorizontalLayout {
+        alignment: end;
+        spacing: 8px;
+        Button {
+            kind: ButtonKind.ghost;
+            text: "Отмена";
+            clicked => { App.sub-dialog = ""; }
+        }
+        Button {
+            kind: ButtonKind.destructive;
+            text: "Удалить";
+            clicked => {
+                App.remove-subscription(App.sub-dialog-id);
+                App.sub-dialog = "";
+            }
+        }
+    }
+}

@@ -1,0 +1,10 @@
+resources/cores/*
+!resources/cores/.gitkeep
+resources/geo/*
+!resources/geo/.gitkeep
+resources/routing/*
+!resources/routing/.gitkeep
+*.log
+.DS_Store
+/target/
+/release/

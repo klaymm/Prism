@@ -1,0 +1,188 @@
+import { Theme } from "@prism/theme.slint";
+import { Icons } from "@prism/icons.slint";
+import { Button, ButtonKind, CardFrame, Label, PageHeader, ScrollArea, Segmented, TextField } from "@prism/controls.slint";
+import { PopupMenu, Tip } from "@prism/overlays.slint";
+import { App } from "globals.slint";
+
+export component LogsPage inherits VerticalLayout {
+    property <string> level: "all";
+    property <string> source: "all";
+    property <string> query;
+    property <bool> follow: true;
+    property <int> menu-id;
+    property <length> menu-x;
+    property <length> menu-y;
+    init => { App.logs-filter("all", "all", ""); }
+
+    PageHeader {
+        title: "Логи";
+        description: "Сообщения приложения и ядер Xray / sing-box";
+        Tip {
+            tip: "Копировать отображаемые строки";
+            width: 36px;
+            height: 36px;
+            Button {
+                label: "Копировать логи";
+                square: true;
+                kind: ButtonKind.outline;
+                icon: Icons.copy;
+                enabled: App.logs.length > 0;
+                clicked => { App.copy-logs(); }
+            }
+        }
+        Tip {
+            tip: "Очистить";
+            width: 36px;
+            height: 36px;
+            Button {
+                label: "Очистить логи";
+                square: true;
+                kind: ButtonKind.outline;
+                icon: Icons.trash;
+                enabled: App.log-total > 0;
+                clicked => { App.clear-logs(); }
+            }
+        }
+    }
+    HorizontalLayout {
+        padding-bottom: 12px;
+        spacing: 12px;
+        vertical-stretch: 0;
+        Segmented {
+            small: true;
+            items: [
+                { value: "all", label: "Все" },
+                { value: "warning", label: "Предупреждения" },
+                { value: "error", label: "Ошибки" },
+            ];
+            value: root.level;
+            changed(v) => {
+                root.level = v;
+                App.logs-filter(root.level, root.source, root.query);
+            }
+        }
+        Segmented {
+            small: true;
+            items: [
+                { value: "all", label: "Все" },
+                { value: "xray", label: "Xray" },
+                { value: "sing-box", label: "sing-box" },
+                { value: "app", label: "Приложение" },
+            ];
+            value: root.source;
+            changed(v) => {
+                root.source = v;
+                App.logs-filter(root.level, root.source, root.query);
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            TextField {
+                height: 32px;
+                min-width: 160px;
+                icon: Icons.search;
+                placeholder: "Поиск";
+                edited(t) => {
+                    root.query = t;
+                    App.logs-filter(root.level, root.source, root.query);
+                }
+            }
+        }
+    }
+    card := CardFrame {
+        vertical-stretch: 1;
+        min-height: 288px;
+        list := ScrollArea {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            inset-left: 16px;
+            inset-right: 16px;
+            inset-top: 12px;
+            inset-bottom: 12px;
+            clip: true;
+            scrolled => { root.follow = self.at-bottom; }
+            changed content-height => {
+                if root.follow {
+                    self.scroll-to-bottom();
+                }
+            }
+            for row in App.logs: Rectangle {
+                height: line.preferred-height;
+                line := HorizontalLayout {
+                    spacing: 12px;
+                    Label {
+                        text: row.time;
+                        font-family: Theme.mono;
+                        font-size: 12px;
+                        line-height: 20px;
+                        color: Theme.subtle-foreground;
+                    }
+                    Label {
+                        width: 28px;
+                        text: row.level-text;
+                        font-family: Theme.mono;
+                        font-size: 12px;
+                        line-height: 20px;
+                        font-weight: 600;
+                        color: row.level == 0 ? Theme.destructive : row.level == 1 ? Theme.warning : row.level == 2 ? Theme.muted-foreground : Theme.subtle-foreground;
+                    }
+                    Label {
+                        width: 64px;
+                        text: row.source;
+                        font-family: Theme.mono;
+                        font-size: 12px;
+                        line-height: 20px;
+                        color: Theme.subtle-foreground;
+                        overflow: elide;
+                    }
+                    Label {
+                        horizontal-stretch: 1;
+                        text: row.message;
+                        font-family: Theme.mono;
+                        font-size: 12px;
+                        line-height: 20px;
+                        wrap: char-wrap;
+                    }
+                }
+                TouchArea {
+                    pointer-event(e) => {
+                        if e.kind == PointerEventKind.down && e.button == PointerEventButton.right {
+                            root.menu-id = row.id;
+                            root.menu-x = self.absolute-position.x - root.absolute-position.x + self.mouse-x;
+                            root.menu-y = self.absolute-position.y - root.absolute-position.y + self.mouse-y;
+                            menu.show();
+                        }
+                    }
+                }
+            }
+            if App.logs.length == 0: Label {
+                height: 100px;
+                text: "Записей нет";
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                color: Theme.muted-foreground;
+            }
+        }
+        if !root.follow: Button {
+            x: parent.width - self.width - 16px;
+            y: parent.height - self.height - 16px;
+            small: true;
+            kind: ButtonKind.primary;
+            text: "К последним";
+            icon: Icons.arrow-down-to-line;
+            clicked => {
+                root.follow = true;
+                list.scroll-to-bottom();
+            }
+        }
+    }
+    menu := PopupMenu {
+        x: root.menu-x;
+        y: root.menu-y;
+        entries: [{ label: "Копировать строку", icon: Icons.copy }];
+        selected => { App.copy-log(root.menu-id); }
+    }
+}

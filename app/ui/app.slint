@@ -1,0 +1,100 @@
+import { Theme } from "@prism/theme.slint";
+import { ScrollArea } from "@prism/controls.slint";
+import { TipLayer, TipState, ToastLayer } from "@prism/overlays.slint";
+import { App, Page } from "globals.slint";
+import { Sidebar, TitleBar } from "shell.slint";
+import { HomePage } from "home.slint";
+import { ServersPage } from "servers.slint";
+import { RoutingPage } from "routing.slint";
+import { SpeedPage } from "speed.slint";
+import { LogsPage } from "logs.slint";
+import { SettingsPage } from "settings.slint";
+import { ElevationDialog, ImportDialog, RemoveSubscriptionDialog, RenameDialog } from "dialogs.slint";
+
+export { App, Theme, TipState }
+export { PrismTray } from "tray.slint";
+
+component PageView inherits ScrollArea {
+    property <float> shown: 0;
+    init => { self.shown = 1; }
+    animate shown { duration: 160ms; easing: ease-out; }
+    opacity: self.shown;
+    inset-left: 28px;
+    inset-right: 28px;
+    inset-bottom: 28px;
+}
+
+export component AppWindow inherits Window {
+    in property <string> window-title: "Prism";
+    title: self.window-title;
+    no-frame: true;
+    resize-border-width: 6px;
+    preferred-width: 1000px;
+    preferred-height: 660px;
+    min-width: 880px;
+    min-height: 580px;
+    background: Theme.background;
+    default-font-family: Theme.sans;
+    default-font-size: 14px;
+    forward-focus: scope;
+
+    scope := FocusScope {
+        key-pressed(e) => {
+            if e.modifiers.control && !e.modifiers.alt
+                && (e.text == "v" || e.text == "V" || e.text == "м" || e.text == "М" || e.text == "\u{16}") {
+                App.paste-anywhere();
+                return accept;
+            }
+            reject
+        }
+        TouchArea {
+            clicked => { scope.focus(); }
+        }
+        HorizontalLayout {
+            Sidebar { }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                TitleBar { }
+                Rectangle {
+                    vertical-stretch: 1;
+                    if App.page == Page.home: PageView {
+                        HomePage { }
+                    }
+                    if App.page == Page.servers: PageView {
+                        ServersPage { }
+                    }
+                    if App.page == Page.routing: PageView {
+                        RoutingPage { }
+                    }
+                    if App.page == Page.speed: PageView {
+                        SpeedPage { }
+                    }
+                    if App.page == Page.logs: Rectangle {
+                        property <float> shown: 0;
+                        init => { self.shown = 1; }
+                        animate shown { duration: 160ms; easing: ease-out; }
+                        opacity: self.shown;
+                        LogsPage {
+                            x: 28px;
+                            y: 0px;
+                            width: parent.width - 56px;
+                            height: parent.height - 28px;
+                        }
+                    }
+                    if App.page == Page.settings: PageView {
+                        SettingsPage { }
+                    }
+                }
+            }
+        }
+        if App.import-open: ImportDialog { }
+        if App.elevation-open: ElevationDialog { }
+        if App.sub-dialog == "rename": RenameDialog { }
+        if App.sub-dialog == "remove": RemoveSubscriptionDialog { }
+        ToastLayer {
+            toasts: App.toasts;
+            dismiss(id) => { App.dismiss-toast(id); }
+        }
+        TipLayer { }
+    }
+}

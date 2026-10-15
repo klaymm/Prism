@@ -1,0 +1,48 @@
+import { Palette } from "std-widgets.slint";
+
+import "fonts/PrismInter-Regular.ttf";
+import "fonts/PrismInter-Medium.ttf";
+import "fonts/PrismInter-SemiBold.ttf";
+import "fonts/PrismInterTabular-Regular.ttf";
+import "fonts/PrismInterTabular-Medium.ttf";
+import "fonts/PrismInterTabular-SemiBold.ttf";
+
+export global Theme {
+    in-out property <string> mode: "system";
+    out property <bool> dark: mode == "dark" || (mode == "system" && Palette.color-scheme == ColorScheme.dark);
+
+    out property <string> sans: "Prism Inter";
+    out property <string> tabular: "Prism Inter Tabular";
+    in-out property <string> mono: "Cascadia Mono";
+
+    out property <color> background: dark ? #0f172a : #f1f5f9;
+    out property <color> sidebar: dark ? #0b1220 : #f8fafc;
+    out property <color> card: dark ? #192134 : #ffffff;
+    out property <color> card-hover: dark ? #1d2740 : #f8fafc;
+    out property <color> muted: dark ? #10192e : #f1f5f9;
+    out property <color> hover: dark ? #222d44 : #e8edf3;
+    out property <color> foreground: dark ? #f8fafc : #0f172a;
+    out property <color> muted-foreground: dark ? #a3b1c6 : #5b6b82;
+    out property <color> subtle-foreground: dark ? #94a3b8 : #64748b;
+    out property <color> border: dark ? #ffffff14 : #e2e8f0;
+    out property <color> border-strong: dark ? #ffffff29 : #cbd5e1;
+    out property <color> primary: dark ? #2a5282 : #1e3a5f;
+    out property <color> primary-hover: dark ? #325f96 : #25476f;
+    out property <color> on-primary: #ffffff;
+    out property <color> accent: dark ? #22c55e : #16a34a;
+    out property <color> accent-hover: dark ? #16a34a : #15803d;
+    out property <color> accent-soft: dark ? #22c55e24 : #16a34a1f;
+    out property <color> accent-soft-row: dark ? #22c55e15 : #16a34a12;
+    out property <color> on-accent: dark ? #0f172a : #ffffff;
+    out property <color> warning: dark ? #f59e0b : #b45309;
+    out property <color> warning-soft: dark ? #f59e0b24 : #d9770624;
+    out property <color> destructive: dark ? #f05252 : #dc2626;
+    out property <color> destructive-soft: dark ? #f0525224 : #dc26261a;
+    out property <color> ring: dark ? #e2e8f0 : #1e3a5f;
+    out property <color> series-down: dark ? #3987e5 : #2a78d6;
+    out property <color> series-up: dark ? #d95926 : #eb6834;
+    out property <color> grid: dark ? #ffffff12 : #e2e8f0;
+    out property <color> selection: series-down.with-alpha(0.35);
+    out property <color> shadow-color: dark ? #000000 : #0f172a;
+    out property <float> shadow-strength: dark ? 0.45 : 0.14;
+}

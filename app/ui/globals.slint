@@ -1,0 +1,240 @@
+import { Option, ToastData } from "@prism/overlays.slint";
+import { SegmentItem } from "@prism/controls.slint";
+
+export enum Page { home, servers, routing, speed, logs, settings }
+
+export struct ServerRow {
+    id: string,
+    label: string,
+    flag: image,
+    transport: string,
+    latency: string,
+    latency-tone: int,
+    latency-tip: string,
+    selected: bool,
+    live: bool,
+    manual: bool,
+}
+
+export struct SubInfo {
+    id: string,
+    name: string,
+    used: string,
+    total: string,
+    has-total: bool,
+    ratio: float,
+    has-expire: bool,
+    expire: string,
+    days: string,
+    warn: bool,
+    updated: string,
+    error: string,
+    has-support: bool,
+}
+
+export struct LogRow {
+    id: int,
+    time: string,
+    level: int,
+    level-text: string,
+    source: string,
+    message: string,
+}
+
+export struct SpeedRow {
+    at: string,
+    server: string,
+    down: string,
+    up: string,
+    ping: string,
+}
+
+export struct RuleTag {
+    label: string,
+    tag: string,
+}
+
+export struct ChartHover {
+    visible: bool,
+    x: float,
+    down-y: float,
+    up-y: float,
+    ago: string,
+    down: string,
+    up: string,
+}
+
+export global App {
+    in-out property <Page> page: Page.home;
+    in property <string> version;
+    in property <bool> elevated;
+    in property <string> cores-text;
+    in property <string> data-dir;
+    in property <bool> maximized;
+
+    // Settings
+    in property <string> theme: "system";
+    in property <string> routing-mode: "smart";
+    in property <bool> ru-direct: true;
+    in property <[RuleTag]> proxy-rules;
+    in property <[RuleTag]> direct-rules;
+    in property <[RuleTag]> direct-apps;
+    in property <bool> tun;
+    in property <bool> autostart;
+    in property <bool> connect-on-launch;
+    in property <bool> close-to-tray: true;
+    in property <bool> auto-update: true;
+    in property <string> socks-port;
+    in property <string> http-port;
+    in property <bool> allow-lan;
+    in property <string> log-level;
+    in property <string> tun-stack;
+    in property <string> tun-mtu;
+    in property <string> user-agent;
+    in property <string> routing-url;
+    in property <bool> routing-url-default: true;
+
+    // Connection
+    in property <string> status: "disconnected";
+    in property <string> conn-error;
+    in property <string> conn-note;
+    in property <string> duration;
+    in property <string> ip;
+    in property <bool> ip-pending;
+    in property <image> ip-flag;
+    in property <bool> conn-tun;
+    in property <string> sidebar-detail;
+
+    // Home server
+    in property <bool> has-server;
+    in property <ServerRow> current;
+
+    // Traffic
+    in property <string> down-rate;
+    in property <string> up-rate;
+    in property <string> down-total;
+    in property <string> up-total;
+    in property <string> down-line;
+    in property <string> down-area;
+    in property <string> up-line;
+    in property <string> up-area;
+    in property <[string]> y-ticks: ["0", "32,0 КБ/с", "64,0 КБ/с"];
+    in property <bool> chart-empty: true;
+    in property <int> chart-rev;
+    pure callback chart-hover(float, int) -> ChartHover;
+    callback chart-size(float, float);
+
+    // Home subscription
+    in property <bool> has-sub;
+    in property <SubInfo> home-sub;
+    in property <bool> home-sub-busy;
+
+    // Servers page
+    in property <int> server-count;
+    in property <string> server-count-text;
+    in property <[Option]> sub-tabs;
+    in property <[SegmentItem]> sub-tab-items;
+    in property <string> server-tab: "all";
+    in property <[ServerRow]> servers;
+    in property <bool> pinging;
+    in property <bool> has-active-sub;
+    in property <SubInfo> active-sub;
+    in property <bool> active-sub-busy;
+
+    // Routing page
+    in property <string> routing-meta;
+    in property <string> routing-error;
+    in property <bool> routing-busy;
+    in property <[RuleTag]> proxy-tags;
+    in property <[RuleTag]> direct-tags;
+    in property <[RuleTag]> block-tags;
+    in property <string> fallthrough;
+    in property <string> remote-dns;
+    in property <string> domestic-dns;
+
+    // Speed page
+    in property <bool> speed-running;
+    in property <int> speed-step: -1;
+    in property <float> speed-progress;
+    in property <string> speed-hero;
+    in property <string> speed-hero-label;
+    in property <string> speed-down;
+    in property <string> speed-up;
+    in property <string> speed-ping;
+    in property <string> speed-jitter;
+    in property <[Option]> speed-targets;
+    in property <string> speed-target;
+    in property <[SpeedRow]> speed-history;
+
+    // Logs page
+    in property <[LogRow]> logs;
+    in property <int> log-total;
+
+    // Prism updates
+    in property <string> update-text: "Ещё не проверялись";
+    in property <bool> update-available;
+    in property <bool> update-busy;
+    in property <string> update-version;
+    in property <bool> has-release-page;
+
+    // Overlays
+    in-out property <bool> import-open;
+    in-out property <string> import-text;
+    in property <bool> import-busy;
+    in property <string> import-error;
+    in-out property <bool> elevation-open;
+    in property <bool> elevation-busy;
+    in-out property <string> sub-dialog;
+    in-out property <string> sub-dialog-id;
+    in-out property <string> sub-dialog-name;
+    in property <[ToastData]> toasts;
+
+    // Window
+    callback minimize();
+    callback toggle-maximize();
+    callback close-window();
+    callback caption-pressed();
+
+    // Connection calls
+    callback navigate(Page);
+    callback toggle-connection();
+    callback set-mode(string);
+    callback set-tun(bool);
+    callback check-ip();
+    callback restart-as-admin();
+
+    // Subscription calls
+    callback open-import();
+    callback import-submit(string);
+    callback import-paste();
+    callback paste-anywhere();
+    callback refresh-subscription(string);
+    callback subscription-action(string, string);
+    callback rename-subscription(string, string);
+    callback remove-subscription(string);
+    callback servers-filter(string, string, string);
+    callback select-server(string);
+    callback connect-server(string);
+    callback server-action(string, string);
+    callback ping(string);
+
+    // Page calls
+    callback refresh-routing();
+    callback add-rules(string, string) -> string;
+    callback remove-rule(string, string);
+    callback pick-app();
+    callback speed-select(string);
+    callback speed-start();
+    callback speed-cancel();
+    callback logs-filter(string, string, string);
+    callback copy-logs();
+    callback copy-log(int);
+    callback clear-logs();
+    callback set-setting(string, string);
+    callback open-data-dir();
+    callback check-update();
+    callback install-update();
+    callback open-release-page();
+    callback quit();
+    callback dismiss-toast(int);
+}

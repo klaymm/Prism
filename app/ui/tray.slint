@@ -1,0 +1,78 @@
+export struct TrayServer {
+    id: string,
+    name: string,
+    selected: bool,
+}
+
+export component PrismTray inherits SystemTrayIcon {
+    in property <bool> connected;
+    in property <bool> active;
+    in property <string> status-text: "Отключено";
+    in property <string> app-name: "Prism";
+    in property <string> mode: "smart";
+    in property <bool> tun;
+    in property <[TrayServer]> servers;
+    callback open();
+    callback toggle();
+    callback set-mode(string);
+    callback select-server(string);
+    callback toggle-tun();
+    callback quit();
+
+    icon: root.connected ? @image-url("../icons/tray/on.png") : @image-url("../icons/tray/idle.png");
+    tooltip: root.app-name + (root.connected ? " — подключено" : " — отключено");
+    clicked => { root.open(); }
+
+    Menu {
+        MenuItem {
+            title: root.status-text;
+            enabled: false;
+        }
+        MenuItem {
+            title: root.active ? "Отключить" : "Подключить";
+            activated => { root.toggle(); }
+        }
+        MenuSeparator { }
+        Menu {
+            title: "Режим";
+            MenuItem {
+                title: "Всё, кроме РФ";
+                checkable: true;
+                checked: root.mode == "smart";
+                activated => { root.set-mode("smart"); }
+            }
+            MenuItem {
+                title: "Глобальный";
+                checkable: true;
+                checked: root.mode == "global";
+                activated => { root.set-mode("global"); }
+            }
+        }
+        Menu {
+            title: "Сервер";
+            enabled: root.servers.length > 0;
+            for server in root.servers: MenuItem {
+                title: server.name;
+                checkable: true;
+                checked: server.selected;
+                activated => { root.select-server(server.id); }
+            }
+        }
+        MenuItem {
+            title: "Режим TUN";
+            checkable: true;
+            checked: root.tun;
+            activated => { root.toggle-tun(); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "Открыть " + root.app-name;
+            activated => { root.open(); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "Выход";
+            activated => { root.quit(); }
+        }
+    }
+}

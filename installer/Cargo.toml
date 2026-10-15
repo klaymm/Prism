@@ -1,0 +1,29 @@
+[package]
+name = "prism-setup"
+description = "Prism Setup — installs and removes Prism"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+prism-ui = { path = "../crates/prism-ui" }
+prism-win = { path = "../crates/prism-win" }
+slint = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+windows-sys = { workspace = true }
+winreg = "0.56"
+mslnk = "0.1"
+brotli-decompressor = "6"
+sha2 = "0.11"
+dirs = "6"
+rfd = { version = "0.16", default-features = false }
+
+[dev-dependencies]
+brotli = "9"
+
+[build-dependencies]
+slint-build = { workspace = true }
+embed-resource = "3"

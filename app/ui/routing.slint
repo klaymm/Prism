@@ -1,0 +1,425 @@
+import { Theme } from "@prism/theme.slint";
+import { Icons } from "@prism/icons.slint";
+import { Button, ButtonKind, Card, Icon, Label, PageHeader, Switch, TextField } from "@prism/controls.slint";
+import { Tip } from "@prism/overlays.slint";
+import { App, RuleTag } from "globals.slint";
+
+component ModeCard inherits Rectangle {
+    in property <string> mode;
+    in property <string> title;
+    in property <string> text;
+    in property <image> icon;
+    property <bool> active: App.routing-mode == root.mode;
+    border-radius: 12px;
+    background: Theme.card;
+    border-width: 1px;
+    border-color: self.active ? Theme.accent : touch.has-hover ? Theme.border-strong : Theme.border;
+    animate border-color { duration: 150ms; }
+    accessible-role: radio-button;
+    accessible-label: root.title;
+    accessible-checked: self.active;
+    accessible-action-default => { App.set-mode(root.mode); }
+    if root.active: Rectangle {
+        x: -1px;
+        y: -1px;
+        width: parent.width + 2px;
+        height: parent.height + 2px;
+        border-radius: 13px;
+        border-width: 1px;
+        border-color: Theme.accent;
+    }
+    VerticalLayout {
+        padding: 17px;
+        spacing: 8px;
+        alignment: start;
+        HorizontalLayout {
+            alignment: start;
+            Rectangle {
+                width: 36px;
+                height: 36px;
+                border-radius: 8px;
+                background: root.active ? Theme.accent-soft : Theme.muted;
+                Icon {
+                    source: root.icon;
+                    width: 20px;
+                    height: 20px;
+                    colorize: root.active ? Theme.accent : Theme.muted-foreground;
+                }
+            }
+        }
+        Label {
+            text: root.title;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        Label {
+            text: root.text;
+            wrap: word-wrap;
+            font-size: 13px;
+            line-height: 13px * 1.375;
+            color: Theme.muted-foreground;
+        }
+    }
+    if root.active: Rectangle {
+        x: parent.width - 17px - 20px;
+        y: 17px;
+        width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        background: Theme.accent;
+        Icon { source: Icons.check-bold; width: 14px; height: 14px; colorize: Theme.on-accent; }
+    }
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => { App.set-mode(root.mode); }
+    }
+}
+
+component RuleGroup inherits VerticalLayout {
+    in property <string> title;
+    in property <image> icon;
+    in property <color> tint;
+    in property <[RuleTag]> tags;
+    spacing: 8px;
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        VerticalLayout {
+            alignment: center;
+            Icon { source: root.icon; colorize: root.tint; }
+        }
+        Label { text: root.title; font-weight: 600; line-height: 20px; }
+    }
+    FlexboxLayout {
+        spacing: 6px;
+        for tag in root.tags: Tip {
+            tip: tag.tag;
+            mono: true;
+            Rectangle {
+                height: 28px;
+                border-radius: 6px;
+                border-width: 1px;
+                border-color: Theme.border;
+                background: Theme.muted;
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    Label {
+                        text: tag.label;
+                        vertical-alignment: center;
+                        font-size: 13px;
+                    }
+                }
+            }
+        }
+    }
+}
+
+component RuleChip inherits Rectangle {
+    in property <string> label;
+    callback remove();
+    height: 28px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: Theme.muted;
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 3px;
+        spacing: 4px;
+        Label {
+            text: root.label;
+            vertical-alignment: center;
+            font-family: Theme.mono;
+            font-size: 12px;
+        }
+        VerticalLayout {
+            alignment: center;
+            Button {
+                label: "Убрать " + root.label;
+                square: true;
+                height: 22px;
+                radius: 4px;
+                icon-size: 12px;
+                kind: ButtonKind.ghost;
+                icon: Icons.x;
+                clicked => { root.remove(); }
+            }
+        }
+    }
+}
+
+component RuleList inherits VerticalLayout {
+    in property <string> list;
+    in property <string> title;
+    in property <string> note;
+    in property <string> hint;
+    in property <image> icon;
+    in property <color> tint;
+    in property <[RuleTag]> items;
+    in property <string> placeholder;
+    spacing: 8px;
+    alignment: start;
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        VerticalLayout {
+            alignment: center;
+            Icon { source: root.icon; colorize: root.tint; }
+        }
+        Label { text: root.title; font-weight: 600; line-height: 20px; }
+        if root.note != "": Label {
+            text: root.note;
+            font-size: 13px;
+            line-height: 20px;
+            color: Theme.muted-foreground;
+        }
+    }
+    if root.hint != "": Label {
+        text: root.hint;
+        wrap: word-wrap;
+        font-size: 13px;
+        line-height: 21.5px;
+        color: Theme.muted-foreground;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        field := TextField {
+            horizontal-stretch: 1;
+            placeholder: root.placeholder;
+            mono: true;
+            font-size: 13px;
+            accepted(text) => { self.text = App.add-rules(root.list, text); }
+        }
+        Button {
+            text: "Добавить";
+            icon: Icons.plus;
+            kind: ButtonKind.outline;
+            enabled: field.text != "";
+            clicked => { field.text = App.add-rules(root.list, field.text); }
+        }
+        @children
+    }
+    FlexboxLayout {
+        spacing: 6px;
+        for item in root.items: RuleChip {
+            label: item.label;
+            remove => { App.remove-rule(root.list, item.tag); }
+        }
+    }
+}
+
+export component RoutingPage inherits VerticalLayout {
+    alignment: start;
+    PageHeader {
+        title: "Роутинг";
+        description: "Какой трафик идёт через VPN, а какой — напрямую";
+    }
+    modes := HorizontalLayout {
+        spacing: 12px;
+        padding-bottom: 16px;
+        ModeCard {
+            width: (modes.width - 12px) / 2;
+            mode: "smart";
+            title: "Всё, кроме РФ";
+            text: "Российские сайты и сервисы открываются напрямую, остальное — через VPN. Реклама и телеметрия блокируются.";
+            icon: Icons.map-pinned;
+        }
+        ModeCard {
+            width: (modes.width - 12px) / 2;
+            mode: "global";
+            title: "Глобальный";
+            text: "Весь трафик идёт через VPN. Напрямую — только локальная сеть.";
+            icon: Icons.globe;
+        }
+    }
+    Card {
+        VerticalLayout {
+            padding: 20px;
+            spacing: 20px;
+            VerticalLayout {
+                spacing: 4px;
+                Label { text: "Свои правила"; font-weight: 600; line-height: 20px; }
+                Label {
+                    text: "Работают в обоих режимах и важнее правил ниже. Впишите домен (поддомены входят сами), IP-адрес, подсеть вроде 10.0.0.0/8 или категорию вроде geosite:steam. Можно несколько сразу через запятую";
+                    wrap: word-wrap;
+                    font-size: 13px;
+                    line-height: 21.5px;
+                    color: Theme.muted-foreground;
+                }
+            }
+            RuleList {
+                list: "proxy";
+                title: "Через VPN";
+                note: App.routing-mode == "global" ? "в глобальном режиме и так всё идёт через VPN" : "";
+                icon: Icons.shield;
+                tint: Theme.series-down;
+                items: App.proxy-rules;
+                placeholder: "example.com или 203.0.113.0/24";
+            }
+            RuleList {
+                list: "direct";
+                title: "Напрямую";
+                icon: Icons.waypoints;
+                tint: Theme.accent;
+                items: App.direct-rules;
+                placeholder: "example.ru или 10.0.0.0/8";
+            }
+            RuleList {
+                list: "apps";
+                title: "Программы мимо VPN";
+                note: App.tun ? "" : "только в режиме TUN";
+                hint: App.tun ? "" : "Без TUN программы, которые не пользуются системным прокси (обычно это игры), и так идут мимо VPN";
+                icon: Icons.monitor;
+                tint: Theme.accent;
+                items: App.direct-apps;
+                placeholder: "game.exe";
+                Button {
+                    text: "Выбрать…";
+                    icon: Icons.folder-open;
+                    kind: ButtonKind.outline;
+                    clicked => { App.pick-app(); }
+                }
+            }
+        }
+    }
+    Rectangle { height: 16px; }
+    Card {
+        opacity: App.routing-mode == "global" ? 0.6 : 1;
+        animate opacity { duration: 150ms; }
+        VerticalLayout {
+            padding: 20px;
+            HorizontalLayout {
+                padding-bottom: 16px;
+                spacing: 16px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    Label { text: "Правила «Всё, кроме РФ»"; font-weight: 600; line-height: 20px; }
+                    HorizontalLayout {
+                        padding-top: 2px;
+                        alignment: start;
+                        Label {
+                            text: App.routing-meta;
+                            font-size: 13px;
+                            color: Theme.muted-foreground;
+                        }
+                        if App.routing-error != "": Label {
+                            text: " · " + App.routing-error;
+                            font-size: 13px;
+                            color: Theme.destructive;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                    }
+                }
+                VerticalLayout {
+                    alignment: start;
+                    Button {
+                        small: true;
+                        kind: ButtonKind.outline;
+                        text: "Обновить правила";
+                        icon: Icons.refresh-cw;
+                        loading: App.routing-busy;
+                        clicked => { App.refresh-routing(); }
+                    }
+                }
+            }
+            HorizontalLayout {
+                padding-bottom: 20px;
+                spacing: 24px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    Label { text: "Все сайты .ru, .su и .рф — напрямую"; font-weight: 500; line-height: 20px; }
+                    Label {
+                        text: "И российские облака (Яндекс, VK). Нужно, если ваш сервер не пропускает российские сайты";
+                        wrap: word-wrap;
+                        font-size: 13px;
+                        line-height: 21.5px;
+                        vertical-alignment: bottom;
+                        color: Theme.muted-foreground;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Switch {
+                        label: "Все сайты .ru, .su и .рф — напрямую";
+                        checked: App.ru-direct;
+                        toggled(v) => { App.set-setting("ruDirect", v ? "true" : "false"); }
+                    }
+                }
+            }
+            VerticalLayout {
+            spacing: 20px;
+            if App.proxy-tags.length > 0: RuleGroup {
+                title: "Через VPN";
+                icon: Icons.shield;
+                tint: Theme.series-down;
+                tags: App.proxy-tags;
+            }
+            if App.direct-tags.length > 0: RuleGroup {
+                title: "Напрямую";
+                icon: Icons.waypoints;
+                tint: Theme.accent;
+                tags: App.direct-tags;
+            }
+            if App.block-tags.length > 0: RuleGroup {
+                title: "Блокируются";
+                icon: Icons.ban;
+                tint: Theme.destructive;
+                tags: App.block-tags;
+            }
+            Label {
+                text: App.fallthrough;
+                font-size: 13px;
+                color: Theme.muted-foreground;
+            }
+            }
+        }
+    }
+    Rectangle { height: 16px; }
+    Card {
+        VerticalLayout {
+            padding: 20px;
+            spacing: 12px;
+            Label { text: "DNS"; font-weight: 600; line-height: 20px; }
+            VerticalLayout {
+                spacing: 8px;
+                HorizontalLayout {
+                    Label { width: 180px; text: "Для зарубежных сайтов"; font-size: 13px; color: Theme.muted-foreground; }
+                    HorizontalLayout {
+                        alignment: start;
+                        TextInput {
+                            text: App.remote-dns;
+                            read-only: true;
+                            font-family: Theme.mono;
+                            font-size: 13px;
+                            color: Theme.foreground;
+                            vertical-alignment: center;
+                            selection-background-color: Theme.selection;
+                            selection-foreground-color: Theme.foreground;
+                        }
+                        Label { text: " — через VPN"; font-size: 13px; color: Theme.subtle-foreground; }
+                    }
+                }
+                HorizontalLayout {
+                    Label { width: 180px; text: "Для российских сайтов"; font-size: 13px; color: Theme.muted-foreground; }
+                    HorizontalLayout {
+                        alignment: start;
+                        TextInput {
+                            text: App.domestic-dns;
+                            read-only: true;
+                            font-family: Theme.mono;
+                            font-size: 13px;
+                            color: Theme.foreground;
+                            vertical-alignment: center;
+                            selection-background-color: Theme.selection;
+                            selection-foreground-color: Theme.foreground;
+                        }
+                        Label { text: " — напрямую"; font-size: 13px; color: Theme.subtle-foreground; }
+                    }
+                }
+            }
+        }
+    }
+}

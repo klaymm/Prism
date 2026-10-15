@@ -1,0 +1,26 @@
+[package]
+name = "prism-core"
+description = "Prism VPN logic: cores, routing, subscriptions, latency and speed tests"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+prism-win = { path = "../prism-win" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "net", "sync", "io-util"] }
+reqwest = { version = "0.13", default-features = false, features = ["native-tls", "http2", "charset", "socks", "stream", "json", "gzip"] }
+base64 = "0.23"
+url = "2.5"
+idna = "1"
+percent-encoding = "2.3"
+uuid = { version = "1", features = ["v4"] }
+thiserror = "2"
+parking_lot = "0.12"
+futures-util = "0.3"
+bytes = "1"
+sha2 = "0.11"
+winreg = "0.56"

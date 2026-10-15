@@ -1,0 +1,337 @@
+import { Theme } from "@prism/theme.slint";
+import { Icons } from "@prism/icons.slint";
+import { Badge, Button, ButtonKind, Card, EmptyState, Flag, Icon, Label, LatencyPill, PageHeader, Segmented, StatusDot, TextField } from "@prism/controls.slint";
+import { PopupMenu, Select, Tip } from "@prism/overlays.slint";
+import { App, ServerRow, SubInfo } from "globals.slint";
+
+component MoreButton inherits Rectangle {
+    in property <string> label;
+    callback clicked;
+    width: 32px;
+    height: 32px;
+    Button {
+        label: root.label;
+        square: true;
+        small: true;
+        kind: ButtonKind.ghost;
+        icon: Icons.ellipsis;
+        clicked => { root.clicked(); }
+    }
+}
+
+component SubscriptionBar inherits Rectangle {
+    in property <SubInfo> sub;
+    in property <bool> busy;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: Theme.card;
+    HorizontalLayout {
+        padding-left: 17px;
+        padding-right: 17px;
+        padding-top: 11px;
+        padding-bottom: 11px;
+        spacing: 12px;
+        FlexboxLayout {
+            horizontal-stretch: 1;
+            spacing-horizontal: 16px;
+            spacing-vertical: 4px;
+            cross-axis-alignment: center;
+            Label { text: root.sub.name; font-size: 13px; font-weight: 500; }
+            Label { text: root.sub.updated; font-size: 13px; color: Theme.muted-foreground; }
+            Label { text: root.sub.used + " из " + root.sub.total; tabular: true; font-size: 13px; color: Theme.muted-foreground; }
+            if root.sub.has-expire: Label {
+                text: root.sub.expire;
+                font-size: 13px;
+                font-weight: root.sub.warn ? 500 : 400;
+                color: root.sub.warn ? Theme.warning : Theme.muted-foreground;
+            }
+            if root.sub.error != "": Tip {
+                tip: root.sub.error;
+                Label { text: "ошибка обновления"; font-size: 13px; color: Theme.destructive; }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Button {
+                small: true;
+                kind: ButtonKind.ghost;
+                text: "Обновить";
+                icon: Icons.refresh-cw;
+                loading: root.busy;
+                clicked => { App.subscription-action(root.sub.id, "refresh"); }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            more := MoreButton {
+                label: "Действия с подпиской";
+                clicked => { menu.show(); }
+                menu := PopupMenu {
+                    x: more.width - self.width;
+                    y: more.height + 6px;
+                    entries: root.sub.has-support ? [
+                        { label: "Переименовать", icon: Icons.pencil },
+                        { label: "Копировать ссылку", icon: Icons.copy },
+                        { label: "Поддержка", icon: Icons.life-buoy },
+                        { separator: true },
+                        { label: "Удалить подписку", icon: Icons.trash, danger: true },
+                    ] : [
+                        { label: "Переименовать", icon: Icons.pencil },
+                        { label: "Копировать ссылку", icon: Icons.copy },
+                        { separator: true },
+                        { label: "Удалить подписку", icon: Icons.trash, danger: true },
+                    ];
+                    selected(i) => {
+                        if i == 0 {
+                            App.sub-dialog-id = root.sub.id;
+                            App.sub-dialog-name = root.sub.name;
+                            App.sub-dialog = "rename";
+                        } else if i == 1 {
+                            App.subscription-action(root.sub.id, "copy");
+                        } else if i == 2 && root.sub.has-support {
+                            App.subscription-action(root.sub.id, "support");
+                        } else if i >= 3 {
+                            App.sub-dialog-id = root.sub.id;
+                            App.sub-dialog-name = root.sub.name;
+                            App.sub-dialog = "remove";
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component ServerItem inherits Rectangle {
+    in property <ServerRow> server;
+    in property <bool> last;
+    height: root.last ? 48px : 49px;
+    background: root.server.selected ? Theme.accent-soft-row : touch.has-hover || more.hovered ? Theme.card-hover : transparent;
+    animate background { duration: 150ms; }
+    accessible-role: list-item;
+    accessible-label: root.server.label;
+    if !root.last: Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-bottom: root.last ? 0px : 1px;
+        spacing: 12px;
+        Rectangle {
+            horizontal-stretch: 1;
+            touch := TouchArea {
+                mouse-cursor: MouseCursor.pointer;
+                clicked => { App.select-server(root.server.id); }
+                double-clicked => { App.connect-server(root.server.id); }
+            }
+            HorizontalLayout {
+                spacing: 12px;
+                Rectangle {
+                    width: 12px;
+                    if root.server.live: StatusDot { status: "connected"; }
+                    if !root.server.live: Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        border-width: 1px;
+                        border-color: root.server.selected ? Theme.accent : Theme.border-strong;
+                        background: root.server.selected ? Theme.accent : transparent;
+                    }
+                }
+                HorizontalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 10px;
+                    VerticalLayout {
+                        alignment: center;
+                        Flag { image: root.server.flag; }
+                    }
+                    Label {
+                        horizontal-stretch: 1;
+                        text: root.server.label;
+                        vertical-alignment: center;
+                        font-weight: 500;
+                        overflow: elide;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Badge { text: root.server.transport; }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Tip {
+                        tip: root.server.latency-tip;
+                        LatencyPill {
+                            text: root.server.latency;
+                            tone: root.server.latency-tone;
+                            loading: App.pinging;
+                        }
+                    }
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            more := Rectangle {
+                width: 32px;
+                height: 32px;
+                out property <bool> hovered: btn.hovered;
+                btn := Button {
+                    label: "Действия: " + root.server.label;
+                    square: true;
+                    small: true;
+                    kind: ButtonKind.ghost;
+                    icon: Icons.ellipsis;
+                    clicked => { menu.show(); }
+                }
+                menu := PopupMenu {
+                    x: more.width - self.width;
+                    y: more.height + 6px;
+                    entries: root.server.manual ? [
+                        { label: root.server.live ? "Переподключиться" : "Подключиться", icon: Icons.plug },
+                        { label: "Проверить задержку", icon: Icons.timer },
+                        { label: "Тест скорости", icon: Icons.gauge },
+                        { label: "Копировать ссылку", icon: Icons.copy },
+                        { separator: true },
+                        { label: "Удалить", icon: Icons.trash, danger: true },
+                    ] : [
+                        { label: root.server.live ? "Переподключиться" : "Подключиться", icon: Icons.plug },
+                        { label: "Проверить задержку", icon: Icons.timer },
+                        { label: "Тест скорости", icon: Icons.gauge },
+                        { label: "Копировать ссылку", icon: Icons.copy },
+                    ];
+                    selected(i) => {
+                        App.server-action(root.server.id,
+                            i == 0 ? "connect" : i == 1 ? "ping" : i == 2 ? "speed" : i == 3 ? "copy" : "remove");
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component ServersPage inherits VerticalLayout {
+    property <string> query;
+    property <string> sort: "default";
+    init => { App.servers-filter("all", "", "default"); }
+    alignment: start;
+
+    PageHeader {
+        title: "Серверы";
+        description: App.server-count-text;
+        ping := Rectangle {
+            width: ping-btn.width;
+            height: 36px;
+            ping-btn := Button {
+                kind: ButtonKind.outline;
+                text: "Пинг";
+                icon: Icons.activity;
+                loading: App.pinging;
+                enabled: App.server-count > 0;
+                clicked => { ping-menu.show(); }
+            }
+            ping-menu := PopupMenu {
+                x: ping.width - self.width;
+                y: ping.height + 6px;
+                entries: [
+                    { label: "Реальная задержка", icon: Icons.zap },
+                    { label: "TCP-пинг", icon: Icons.timer },
+                ];
+                selected(i) => { App.ping(i == 0 ? "real" : "tcp"); }
+            }
+        }
+        Button {
+            kind: ButtonKind.primary;
+            text: "Добавить";
+            icon: Icons.plus;
+            clicked => { App.open-import(); }
+        }
+    }
+
+    if App.server-count == 0: Card {
+        EmptyState {
+            icon: Icons.server;
+            title: "Серверов пока нет";
+            text: "Добавьте ссылку на подписку или ссылку vless:// — можно просто нажать Ctrl+V в любом месте окна.";
+            Button {
+                kind: ButtonKind.primary;
+                text: "Добавить подписку";
+                icon: Icons.plus;
+                clicked => { App.open-import(); }
+            }
+        }
+    }
+
+    if App.server-count > 0: VerticalLayout {
+        HorizontalLayout {
+            padding-bottom: 12px;
+            spacing: 12px;
+            if App.sub-tabs.length > 1 && App.sub-tabs.length <= 4: Segmented {
+                small: true;
+                items: App.sub-tab-items;
+                value: App.server-tab;
+                changed(v) => { App.servers-filter(v, root.query, root.sort); }
+            }
+            if App.sub-tabs.length > 4: Select {
+                label: "Подписка";
+                options: App.sub-tabs;
+                value: App.server-tab;
+                changed(v) => { App.servers-filter(v, root.query, root.sort); }
+            }
+            TextField {
+                horizontal-stretch: 1;
+                min-width: 160px;
+                icon: Icons.search;
+                placeholder: "Поиск по названию или адресу";
+                edited(t) => {
+                    root.query = t;
+                    App.servers-filter(App.server-tab, t, root.sort);
+                }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    alignment: center;
+                    Icon { source: Icons.arrow-down-up; colorize: Theme.subtle-foreground; }
+                }
+                Select {
+                    label: "Сортировка";
+                    min-w: 144px;
+                    options: [
+                        { value: "default", label: "Как в подписке" },
+                        { value: "latency", label: "По задержке" },
+                        { value: "name", label: "По названию" },
+                    ];
+                    value: root.sort;
+                    changed(v) => {
+                        root.sort = v;
+                        App.servers-filter(App.server-tab, root.query, v);
+                    }
+                }
+            }
+        }
+        if App.has-active-sub: VerticalLayout {
+            padding-bottom: 12px;
+            SubscriptionBar { sub: App.active-sub; busy: App.active-sub-busy; }
+        }
+        Card {
+            VerticalLayout {
+                for server[i] in App.servers: ServerItem {
+                    server: server;
+                    last: i == App.servers.length - 1;
+                }
+                if App.servers.length == 0: Label {
+                    height: 100px;
+                    text: "Ничего не найдено";
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    color: Theme.muted-foreground;
+                }
+            }
+        }
+    }
+}

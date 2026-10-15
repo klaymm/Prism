@@ -1,0 +1,726 @@
+import { Theme } from "@prism/theme.slint";
+import { Icons } from "@prism/icons.slint";
+import { Badge, Button, ButtonKind, Card, Flag, Icon, Label, LatencyPill, Segmented, Spinner, Switch } from "@prism/controls.slint";
+import { Tip } from "@prism/overlays.slint";
+import { App, ChartHover, Page } from "globals.slint";
+
+component PulseRing inherits Rectangle {
+    in property <duration> delay;
+    property <float> p: mod((animation-tick() + 1600ms - root.delay) / 1ms, 1600) / 1600;
+    property <float> eased: 1 - pow(1 - self.p, 2.2);
+    property <length> size: 104px * (1 + 0.55 * self.eased);
+    x: (128px - self.size) / 2;
+    y: (128px - self.size) / 2;
+    width: self.size;
+    height: self.size;
+    border-radius: self.size / 2;
+    border-width: 2px;
+    border-color: Theme.warning;
+    opacity: 0.55 * (1 - self.eased);
+}
+
+component Glow inherits Rectangle {
+    in property <color> tint;
+    for i in 5: Rectangle {
+        property <length> size: 84px + (i + 1) * 8px;
+        x: (parent.width - self.size) / 2;
+        y: (parent.height - self.size) / 2 + 8px;
+        width: self.size;
+        height: self.size;
+        border-radius: self.size / 2;
+        background: root.tint.with-alpha(0.13 - i * 0.022);
+    }
+}
+
+component ConnectButton inherits Rectangle {
+    in property <string> status;
+    in property <bool> enabled;
+    callback clicked;
+    property <bool> connected: root.status == "connected";
+    property <bool> busy: root.status == "connecting" || root.status == "disconnecting";
+    property <bool> error: root.status == "error";
+    property <bool> hot: touch.has-hover && root.enabled && !self.busy && !self.connected;
+    width: 128px;
+    height: 128px;
+    accessible-role: button;
+    accessible-label: self.connected ? "Отключить VPN" : self.busy ? "Подождите…" : "Подключить VPN";
+    accessible-action-default => { root.clicked(); }
+
+    if root.busy: PulseRing { }
+    if root.busy: PulseRing { delay: 800ms; }
+    if root.connected: Rectangle {
+        border-radius: 64px;
+        background: Theme.accent-soft;
+    }
+    if root.connected: Glow {
+        x: 16px;
+        y: 16px;
+        width: 96px;
+        height: 96px;
+        tint: Theme.accent;
+    }
+    knob := Rectangle {
+        property <length> size: touch.pressed && root.enabled && !root.busy ? 91px : 96px;
+        x: (parent.width - self.size) / 2;
+        y: (parent.height - self.size) / 2;
+        width: self.size;
+        height: self.size;
+        border-radius: self.size / 2;
+        border-width: 2px;
+        animate size { duration: 150ms; }
+        border-color: root.connected ? Theme.accent
+            : root.busy ? Theme.warning
+            : root.hot ? Theme.accent
+            : root.error ? Theme.destructive
+            : Theme.border-strong;
+        background: root.connected ? Theme.accent
+            : root.busy ? Theme.warning-soft
+            : root.error ? Theme.destructive-soft
+            : Theme.muted;
+        animate background, border-color { duration: 200ms; }
+        property <color> fg: root.connected ? Theme.on-accent
+            : root.busy ? Theme.warning
+            : root.hot ? Theme.accent
+            : root.error ? Theme.destructive
+            : Theme.muted-foreground;
+        if root.busy: Spinner { size: 36px; tint: knob.fg; }
+        if !root.busy: Icon {
+            width: 36px;
+            height: 36px;
+            source: Icons.power-bold;
+            colorize: knob.fg;
+        }
+    }
+    touch := TouchArea {
+        x: 16px;
+        y: 16px;
+        width: 96px;
+        height: 96px;
+        mouse-cursor: root.busy ? MouseCursor.wait : root.enabled ? MouseCursor.pointer : MouseCursor.not-allowed;
+        clicked => {
+            if root.enabled && !root.busy {
+                root.clicked();
+            }
+        }
+    }
+}
+
+component Hero inherits Card {
+    property <bool> connected: App.status == "connected";
+    property <bool> failed: App.status == "error";
+    VerticalLayout {
+        padding: 24px;
+        HorizontalLayout {
+            spacing: 24px;
+            ConnectButton {
+                status: App.status;
+                enabled: App.has-server;
+                clicked => { App.toggle-connection(); }
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+                    vertical-stretch: 0;
+                    Label {
+                        text: App.status == "connected" ? "Подключено"
+                            : App.status == "connecting" ? "Подключение…"
+                            : App.status == "disconnecting" ? "Отключение…"
+                            : App.status == "error" ? "Не удалось подключиться"
+                            : "Не подключено";
+                        font-size: 24px;
+                        line-height: 32px;
+                        font-weight: 600;
+                        letter-spacing: -0.6px;
+                        color: root.failed ? Theme.destructive : Theme.foreground;
+                    }
+                    if root.connected && App.duration != "": VerticalLayout {
+                        padding-top: 9.6px;
+                        Label {
+                            text: App.duration;
+                            tabular: true;
+                            line-height: 20px;
+                            color: Theme.muted-foreground;
+                        }
+                    }
+                }
+                Rectangle { height: 4px; }
+                Label {
+                    text: App.status == "error" && App.conn-error != "" ? App.conn-error
+                        : root.connected ? (App.routing-mode == "smart"
+                            ? "Российские сайты открываются напрямую, остальное — через VPN"
+                            : "Весь трафик идёт через VPN")
+                        : App.status == "connecting" ? (App.conn-note != "" ? App.conn-note : "Подключаемся к серверу…")
+                        : App.has-server ? "Нажмите кнопку, чтобы подключиться"
+                        : "Добавьте подписку, чтобы начать";
+                    wrap: word-wrap;
+                    max-lines: 2;
+                    overflow: elide;
+                    line-height: 20px;
+                    vertical-stretch: 0;
+                    color: root.failed ? Theme.destructive : Theme.muted-foreground;
+                }
+                Rectangle { height: 16px; }
+                HorizontalLayout {
+                    spacing: 20px;
+                    alignment: start;
+                    vertical-stretch: 0;
+                    Tip {
+                        tip: App.routing-mode == "smart" ? "Российские сайты напрямую, остальное через VPN" : "Весь трафик через VPN";
+                        Segmented {
+                            items: [
+                                { value: "smart", label: "Всё, кроме РФ" },
+                                { value: "global", label: "Глобальный" },
+                            ];
+                            value: App.routing-mode;
+                            changed(v) => { App.set-mode(v); }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        VerticalLayout {
+                            alignment: center;
+                            Switch {
+                                label: "Режим TUN";
+                                checked: App.tun;
+                                toggled(v) => { App.set-tun(v); }
+                            }
+                        }
+                        Tip {
+                            tip: "Весь трафик системы, включая игры и приложения без поддержки прокси. Нужны права администратора.";
+                            mouse-cursor: MouseCursor.pointer;
+                            clicked => { App.set-tun(!App.tun); }
+                            Label {
+                                text: "Режим TUN";
+                                vertical-alignment: center;
+                                font-weight: 500;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Rectangle { height: 20px; }
+        Rectangle { height: 1px; background: Theme.border; }
+        HorizontalLayout {
+            padding-top: 16px;
+            spacing: 12px;
+            if App.has-server: HorizontalLayout {
+                spacing: 10px;
+                horizontal-stretch: 1;
+                VerticalLayout {
+                    alignment: center;
+                    Flag { image: App.current.flag; }
+                }
+                Label {
+                    text: App.current.label;
+                    vertical-alignment: center;
+                    font-weight: 500;
+                    overflow: elide;
+                    horizontal-stretch: 0;
+                }
+                Rectangle { width: 2px; }
+                VerticalLayout {
+                    alignment: center;
+                    Badge { text: App.current.transport; }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Tip {
+                        tip: App.current.latency-tip;
+                        LatencyPill {
+                            text: App.current.latency;
+                            tone: App.current.latency-tone;
+                            loading: App.pinging;
+                        }
+                    }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Button {
+                    small: true;
+                    kind: ButtonKind.ghost;
+                    text: "Сменить сервер";
+                    trailing-icon: Icons.chevron-right;
+                    clicked => { App.navigate(Page.servers); }
+                }
+            }
+            if !App.has-server: HorizontalLayout {
+                horizontal-stretch: 1;
+                Label {
+                    text: "Серверов пока нет";
+                    vertical-alignment: center;
+                    color: Theme.muted-foreground;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Button {
+                    small: true;
+                    kind: ButtonKind.primary;
+                    text: "Добавить подписку";
+                    icon: Icons.plus;
+                    clicked => { App.open-import(); }
+                }
+            }
+        }
+    }
+}
+
+component Metric inherits VerticalLayout {
+    in property <string> label;
+    in property <color> swatch;
+    in property <image> arrow;
+    in property <string> value;
+    in property <string> total;
+    HorizontalLayout {
+        spacing: 6px;
+        alignment: start;
+        VerticalLayout {
+            alignment: center;
+            Rectangle { width: 14px; height: 2px; border-radius: 1px; background: root.swatch; }
+        }
+        Label {
+            text: root.label;
+            font-size: 12px;
+            line-height: 16px;
+            font-weight: 500;
+            color: Theme.muted-foreground;
+        }
+    }
+    HorizontalLayout {
+        padding-top: 2px;
+        spacing: 4px;
+        alignment: start;
+        VerticalLayout {
+            alignment: center;
+            Icon { source: root.arrow; colorize: Theme.subtle-foreground; }
+        }
+        Label {
+            text: root.value;
+            tabular: true;
+            font-size: 24px;
+            line-height: 32px;
+            font-weight: 600;
+            letter-spacing: -0.6px;
+        }
+    }
+    Label {
+        text: root.total;
+        tabular: true;
+        font-size: 12px;
+        line-height: 16px;
+        color: Theme.subtle-foreground;
+    }
+}
+
+component SeriesKey inherits HorizontalLayout {
+    in property <color> swatch;
+    in property <string> label;
+    in property <string> value;
+    spacing: 16px;
+    HorizontalLayout {
+        spacing: 6px;
+        horizontal-stretch: 1;
+        VerticalLayout {
+            alignment: center;
+            Rectangle { width: 12px; height: 2px; border-radius: 1px; background: root.swatch; }
+        }
+        Label { text: root.label; font-size: 12px; line-height: 16px; color: Theme.muted-foreground; }
+    }
+    Label { text: root.value; tabular: true; font-size: 12px; line-height: 16px; font-weight: 500; horizontal-alignment: right; }
+}
+
+component TrafficChart inherits Rectangle {
+    property <length> pad-l: 64px;
+    property <length> pad-r: 12px;
+    property <length> pad-t: 10px;
+    property <length> pad-b: 24px;
+    property <length> plot-w: self.width - self.pad-l - self.pad-r;
+    property <length> plot-h: self.height - self.pad-t - self.pad-b;
+    property <ChartHover> hover: App.chart-hover(
+        touch.has-hover ? touch.mouse-x / self.plot-w : -1, App.chart-rev);
+    height: 150px;
+    init => { App.chart-size(self.plot-w / 1px, self.plot-h / 1px); }
+    changed plot-w => { App.chart-size(self.plot-w / 1px, self.plot-h / 1px); }
+
+    for tick[i] in App.y-ticks: Rectangle {
+        y: root.pad-t + root.plot-h - root.plot-h * i / 2;
+        height: 1px;
+        Rectangle { x: root.pad-l; width: root.plot-w; height: 1px; background: Theme.grid; }
+        Label {
+            x: 0px;
+            y: -8px;
+            width: root.pad-l - 8px;
+            height: 16px;
+            text: tick;
+            tabular: true;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            font-size: 11px;
+            color: Theme.subtle-foreground;
+        }
+    }
+    Path {
+        x: root.pad-l;
+        y: root.pad-t;
+        width: root.plot-w;
+        height: root.plot-h;
+        viewbox-width: root.plot-w / 1px;
+        viewbox-height: root.plot-h / 1px;
+        commands: App.down-area;
+        fill: Theme.series-down.with-alpha(0.1);
+    }
+    Path {
+        x: root.pad-l;
+        y: root.pad-t;
+        width: root.plot-w;
+        height: root.plot-h;
+        viewbox-width: root.plot-w / 1px;
+        viewbox-height: root.plot-h / 1px;
+        commands: App.up-area;
+        fill: Theme.series-up.with-alpha(0.1);
+    }
+    Path {
+        x: root.pad-l;
+        y: root.pad-t;
+        width: root.plot-w;
+        height: root.plot-h;
+        viewbox-width: root.plot-w / 1px;
+        viewbox-height: root.plot-h / 1px;
+        commands: App.down-line;
+        stroke: Theme.series-down;
+        stroke-width: 2px;
+        stroke-line-join: round;
+        stroke-line-cap: round;
+    }
+    Path {
+        x: root.pad-l;
+        y: root.pad-t;
+        width: root.plot-w;
+        height: root.plot-h;
+        viewbox-width: root.plot-w / 1px;
+        viewbox-height: root.plot-h / 1px;
+        commands: App.up-line;
+        stroke: Theme.series-up;
+        stroke-width: 2px;
+        stroke-line-join: round;
+        stroke-line-cap: round;
+    }
+    Label {
+        x: root.pad-l;
+        y: root.height - 16px;
+        height: 16px;
+        text: "60 с";
+        font-size: 11px;
+        color: Theme.subtle-foreground;
+    }
+    Label {
+        x: root.pad-l + root.plot-w / 2 - self.width / 2;
+        y: root.height - 16px;
+        height: 16px;
+        text: "30 с";
+        font-size: 11px;
+        color: Theme.subtle-foreground;
+    }
+    Label {
+        x: root.pad-l + root.plot-w - self.width;
+        y: root.height - 16px;
+        height: 16px;
+        text: "сейчас";
+        font-size: 11px;
+        color: Theme.subtle-foreground;
+    }
+    if App.chart-empty && App.status != "connected": Label {
+        x: root.pad-l;
+        width: root.width - root.pad-l;
+        height: root.height;
+        text: "Подключитесь, чтобы видеть трафик";
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: Theme.subtle-foreground;
+    }
+    if root.hover.visible: Rectangle {
+        x: root.pad-l + root.plot-w * root.hover.x;
+        y: root.pad-t;
+        width: 1px;
+        height: root.plot-h;
+        background: Theme.border-strong;
+    }
+    if root.hover.visible: Rectangle {
+        x: root.pad-l + root.plot-w * root.hover.x - 5px;
+        y: root.pad-t + root.plot-h * root.hover.down-y - 5px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        background: Theme.card;
+        Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Theme.series-down; }
+    }
+    if root.hover.visible: Rectangle {
+        x: root.pad-l + root.plot-w * root.hover.x - 5px;
+        y: root.pad-t + root.plot-h * root.hover.up-y - 5px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        background: Theme.card;
+        Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Theme.series-up; }
+    }
+    if root.hover.visible: tooltip := Rectangle {
+        x: min(max(root.pad-l + root.plot-w * root.hover.x + 12px, root.pad-l), root.width - 176px);
+        y: 4px;
+        width: max(160px, tip-body.preferred-width);
+        height: tip-body.preferred-height;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: Theme.border;
+        background: Theme.card;
+        tip-body := VerticalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+            Label {
+                text: root.hover.ago;
+                font-size: 12px;
+                line-height: 16px;
+                color: Theme.subtle-foreground;
+            }
+            Rectangle { height: 4px; }
+            SeriesKey { swatch: Theme.series-down; label: "Загрузка"; value: root.hover.down; }
+            SeriesKey { swatch: Theme.series-up; label: "Отдача"; value: root.hover.up; }
+        }
+    }
+    touch := TouchArea {
+        x: root.pad-l;
+        width: root.plot-w;
+    }
+}
+
+component TrafficCard inherits Card {
+    property <bool> connected: App.status == "connected";
+    VerticalLayout {
+        padding: 20px;
+        HorizontalLayout {
+            padding-bottom: 12px;
+            spacing: 32px;
+            alignment: start;
+            Metric {
+                label: "Загрузка";
+                swatch: Theme.series-down;
+                arrow: Icons.arrow-down;
+                value: root.connected ? App.down-rate : "—";
+                total: "за сессию " + (root.connected ? App.down-total : "—");
+            }
+            Metric {
+                label: "Отдача";
+                swatch: Theme.series-up;
+                arrow: Icons.arrow-up;
+                value: root.connected ? App.up-rate : "—";
+                total: "за сессию " + (root.connected ? App.up-total : "—");
+            }
+        }
+        TrafficChart { }
+    }
+}
+
+component IpCard inherits Card {
+    property <bool> connected: App.status == "connected";
+    VerticalLayout {
+        padding: 16px;
+        HorizontalLayout {
+            height: root.connected ? 24px : 16px;
+            spacing: 6px;
+            VerticalLayout {
+                alignment: center;
+                Icon { source: Icons.globe-alt; width: 14px; height: 14px; colorize: Theme.muted-foreground; }
+            }
+            Label {
+                text: "Внешний IP";
+                vertical-alignment: center;
+                font-size: 12px;
+                line-height: 16px;
+                font-weight: 500;
+                color: Theme.muted-foreground;
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                if root.connected: Tip {
+                    x: parent.width - 32px + 6px;
+                    y: -4px;
+                    width: 32px;
+                    height: 32px;
+                    tip: "Проверить ещё раз";
+                    Button {
+                        label: "Проверить IP";
+                        square: true;
+                        small: true;
+                        kind: ButtonKind.ghost;
+                        icon: Icons.refresh-cw;
+                        clicked => { App.check-ip(); }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            padding-top: 8px;
+            spacing: 10px;
+            alignment: start;
+            if root.connected && App.ip-flag.width > 0: VerticalLayout {
+                alignment: center;
+                Flag { image: App.ip-flag; size: 24px; }
+            }
+            TextInput {
+                text: !root.connected ? "—" : App.ip != "" ? App.ip : App.ip-pending ? "определяется…" : "не определён";
+                read-only: true;
+                vertical-alignment: center;
+                font-family: Theme.tabular;
+                font-size: 16px;
+                font-weight: 600;
+                line-height-factor: 24 / 16 / 1.21;
+                color: Theme.foreground;
+                selection-background-color: Theme.selection;
+                selection-foreground-color: Theme.foreground;
+            }
+        }
+        HorizontalLayout {
+            padding-top: 4px;
+            spacing: 6px;
+            alignment: start;
+            if root.connected: VerticalLayout {
+                alignment: center;
+                Icon { source: Icons.shield-check; width: 14px; height: 14px; colorize: Theme.accent; }
+            }
+            Label {
+                text: !root.connected ? "VPN не активен" : App.conn-tun ? "Весь трафик в туннеле (TUN)" : "Системный прокси включён";
+                font-size: 12px;
+                line-height: 16px;
+                color: Theme.subtle-foreground;
+            }
+        }
+    }
+}
+
+component SubscriptionCard inherits Card {
+    if !App.has-sub: VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+        alignment: center;
+        Label {
+            text: "Подписка не добавлена";
+            line-height: 20px;
+            color: Theme.muted-foreground;
+        }
+        HorizontalLayout {
+            alignment: start;
+            Button {
+                small: true;
+                kind: ButtonKind.primary;
+                text: "Добавить";
+                icon: Icons.plus;
+                clicked => { App.open-import(); }
+            }
+        }
+    }
+    if App.has-sub: VerticalLayout {
+        padding: 16px;
+        alignment: start;
+        HorizontalLayout {
+            height: 24px;
+            spacing: 8px;
+            Label {
+                horizontal-stretch: 1;
+                text: App.home-sub.name;
+                vertical-alignment: center;
+                font-size: 12px;
+                line-height: 16px;
+                font-weight: 500;
+                color: Theme.muted-foreground;
+                overflow: elide;
+            }
+            Rectangle {
+                width: 20px;
+                Tip {
+                    x: parent.width - 32px + 6px;
+                    y: -4px;
+                    width: 32px;
+                    height: 32px;
+                    tip: "Обновить подписку";
+                    Button {
+                        label: "Обновить подписку";
+                        square: true;
+                        small: true;
+                        kind: ButtonKind.ghost;
+                        icon: Icons.refresh-cw;
+                        loading: App.home-sub-busy;
+                        clicked => { App.refresh-subscription(App.home-sub.id); }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            padding-top: 8px;
+            alignment: start;
+            Label {
+                text: App.home-sub.used;
+                tabular: true;
+                font-size: 16px;
+                line-height: 24px;
+                font-weight: 600;
+            }
+            Label {
+                text: " из " + App.home-sub.total;
+                tabular: true;
+                line-height: 24px;
+                vertical-alignment: bottom;
+                color: Theme.subtle-foreground;
+            }
+        }
+        Rectangle {
+            height: 14px;
+            Rectangle {
+                y: 8px;
+                height: 6px;
+                border-radius: 3px;
+                background: Theme.muted;
+                if App.home-sub.has-total: Rectangle {
+                    x: 0px;
+                    width: parent.width * max(0.02, App.home-sub.ratio);
+                    border-radius: 3px;
+                    background: App.home-sub.ratio > 0.9 ? Theme.warning : Theme.series-down;
+                    animate width { duration: 500ms; }
+                }
+            }
+        }
+        HorizontalLayout {
+            padding-top: 12px;
+            spacing: 6px;
+            alignment: start;
+            VerticalLayout {
+                alignment: center;
+                Icon { source: Icons.calendar-clock; width: 14px; height: 14px; colorize: Theme.subtle-foreground; }
+            }
+            Label {
+                text: App.home-sub.has-expire ? App.home-sub.expire + App.home-sub.days : "Бессрочно";
+                font-size: 12px;
+                line-height: 16px;
+                font-weight: App.home-sub.warn ? 500 : 400;
+                color: App.home-sub.warn ? Theme.warning : Theme.subtle-foreground;
+            }
+        }
+    }
+}
+
+export component HomePage inherits VerticalLayout {
+    spacing: 16px;
+    alignment: start;
+    Hero { }
+    HorizontalLayout {
+        spacing: 16px;
+        TrafficCard { horizontal-stretch: 1; }
+        VerticalLayout {
+            width: 248px;
+            spacing: 16px;
+            IpCard { }
+            SubscriptionCard { vertical-stretch: 1; }
+        }
+    }
+}

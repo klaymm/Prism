@@ -1,0 +1,171 @@
+import { Theme } from "@prism/theme.slint";
+import { Icons } from "@prism/icons.slint";
+import { Icon, Label, StatusDot } from "@prism/controls.slint";
+import { CaptionButtons, DragArea, Logo } from "@prism/chrome.slint";
+import { App, Page } from "globals.slint";
+
+component NavItem inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <Page> page;
+    in property <bool> dot;
+    property <bool> active: App.page == root.page;
+    property <bool> hot: touch.has-hover && !self.active;
+    height: 36px;
+    border-radius: 8px;
+    background: self.active ? Theme.card : self.hot ? Theme.hover : transparent;
+    accessible-role: tab;
+    accessible-label: root.label;
+    accessible-action-default => { App.navigate(root.page); }
+    if root.active: Rectangle {
+        x: -1px;
+        y: -1px;
+        width: parent.width + 2px;
+        height: parent.height + 2px;
+        border-radius: 9px;
+        border-width: 1px;
+        border-color: Theme.border;
+    }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                source: root.icon;
+                width: 18px;
+                height: 18px;
+                colorize: root.active || root.hot ? Theme.foreground : Theme.subtle-foreground;
+            }
+        }
+        Label {
+            horizontal-stretch: 1;
+            text: root.label;
+            vertical-alignment: center;
+            font-weight: 500;
+            color: root.active || root.hot ? Theme.foreground : Theme.muted-foreground;
+        }
+        if root.dot: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: Theme.accent;
+            }
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => { App.navigate(root.page); }
+    }
+}
+
+export component Sidebar inherits Rectangle {
+    width: 216px;
+    background: Theme.sidebar;
+    Rectangle {
+        x: parent.width - 1px;
+        width: 1px;
+        background: Theme.border;
+    }
+    VerticalLayout {
+        Rectangle {
+            height: 56px;
+            DragArea {
+                caption-pressed => { App.caption-pressed(); }
+            }
+            HorizontalLayout {
+                padding-left: 16px;
+                spacing: 10px;
+                alignment: start;
+                VerticalLayout {
+                    alignment: center;
+                    Logo { width: 28px; height: 28px; }
+                }
+                Label {
+                    text: "Prism";
+                    vertical-alignment: center;
+                    font-size: 15px;
+                    font-weight: 600;
+                    letter-spacing: -0.375px;
+                }
+            }
+        }
+        VerticalLayout {
+            vertical-stretch: 1;
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-top: 8px;
+            spacing: 4px;
+            NavItem { icon: Icons.house; label: "Главная"; page: Page.home; }
+            NavItem { icon: Icons.server; label: "Серверы"; page: Page.servers; }
+            NavItem { icon: Icons.route; label: "Роутинг"; page: Page.routing; }
+            NavItem { icon: Icons.gauge; label: "Скорость"; page: Page.speed; }
+            NavItem { icon: Icons.scroll-text; label: "Логи"; page: Page.logs; }
+            Rectangle { vertical-stretch: 1; }
+            NavItem { icon: Icons.settings; label: "Настройки"; page: Page.settings; dot: App.update-available; }
+        }
+        VerticalLayout {
+            padding: 12px;
+            padding-top: 8px;
+            Rectangle {
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: Theme.border;
+                background: status-touch.has-hover ? Theme.card-hover : Theme.card;
+                HorizontalLayout {
+                    padding-left: 13px;
+                    padding-right: 13px;
+                    padding-top: 11px;
+                    padding-bottom: 11px;
+                    spacing: 10px;
+                    VerticalLayout {
+                        alignment: center;
+                        StatusDot { status: App.status; }
+                    }
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        Label {
+                            text: App.status == "connected" ? "Подключено"
+                                : App.status == "connecting" ? "Подключение…"
+                                : App.status == "disconnecting" ? "Отключение…"
+                                : App.status == "error" ? "Ошибка"
+                                : "Не подключено";
+                            font-size: 13px;
+                            font-weight: 500;
+                        }
+                        Label {
+                            text: App.sidebar-detail;
+                            font-size: 12px;
+                            line-height: 16px;
+                            color: Theme.subtle-foreground;
+                            overflow: elide;
+                        }
+                    }
+                }
+                status-touch := TouchArea {
+                    mouse-cursor: MouseCursor.pointer;
+                    clicked => { App.navigate(Page.home); }
+                }
+            }
+        }
+    }
+}
+
+export component TitleBar inherits Rectangle {
+    height: 40px;
+    DragArea {
+        caption-pressed => { App.caption-pressed(); }
+    }
+    HorizontalLayout {
+        alignment: end;
+        CaptionButtons {
+            maximized: App.maximized;
+            minimize => { App.minimize(); }
+            toggle-maximize => { App.toggle-maximize(); }
+            close => { App.close-window(); }
+        }
+    }
+}

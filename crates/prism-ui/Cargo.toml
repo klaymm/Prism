@@ -1,0 +1,13 @@
+[package]
+name = "prism-ui"
+description = "Look, window chrome and formatting shared by Prism and Prism Setup"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+slint = { workspace = true }
+windows-sys = { workspace = true }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }

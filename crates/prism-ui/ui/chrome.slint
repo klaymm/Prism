@@ -1,0 +1,133 @@
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Icon } from "controls.slint";
+
+component CaptionButton inherits Rectangle {
+    in property <image> icon;
+    in property <length> icon-size: 16px;
+    in property <bool> close;
+    in property <string> label;
+    callback clicked;
+    width: 44px;
+    height: 40px;
+    background: touch.has-hover ? (root.close ? #e81123 : Theme.hover) : transparent;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    Icon {
+        source: root.icon;
+        width: root.icon-size;
+        height: root.icon-size;
+        colorize: touch.has-hover ? (root.close ? #ffffff : Theme.foreground) : Theme.muted-foreground;
+    }
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export component CaptionButtons inherits HorizontalLayout {
+    in property <bool> maximizable: true;
+    in property <bool> maximized;
+    callback minimize();
+    callback toggle-maximize();
+    callback close();
+    CaptionButton {
+        label: "Свернуть";
+        icon: Icons.minus;
+        clicked => { root.minimize(); }
+    }
+    if root.maximizable: CaptionButton {
+        label: root.maximized ? "Восстановить" : "Развернуть";
+        icon: root.maximized ? Icons.restore : Icons.square;
+        icon-size: 14px;
+        clicked => { root.toggle-maximize(); }
+    }
+    CaptionButton {
+        label: "Закрыть";
+        icon: Icons.x;
+        close: true;
+        clicked => { root.close(); }
+    }
+}
+
+export component Logo inherits Image {
+    source: @image-url("logo.svg");
+    image-fit: contain;
+}
+
+export component DragArea inherits TouchArea {
+    callback caption-pressed();
+    pointer-event(e) => {
+        if e.kind == PointerEventKind.down && e.button == PointerEventButton.left {
+            root.caption-pressed();
+        }
+    }
+}
+
+export global Motion {
+    in-out property <bool> reduced;
+}
+
+component Reveal inherits Rectangle {
+    in property <image> source;
+    in property <length> size;
+    in property <float> from;
+    in property <float> to;
+    in property <float> progress;
+    clip: true;
+    x: 0px;
+    y: 0px;
+    width: root.size * (root.from + (root.to - root.from) * root.progress) / 1024;
+    height: root.size;
+    Image {
+        x: 0px;
+        y: 0px;
+        width: root.size;
+        height: root.size;
+        source: root.source;
+    }
+}
+
+export component AnimatedLogo inherits Rectangle {
+    in property <bool> animated: true;
+    property <bool> still: !root.animated || Motion.reduced;
+    property <duration> start;
+    property <float> elapsed: root.still ? 100000 : (animation-tick() - root.start) / 1ms;
+    init => { self.start = animation-tick(); }
+
+    pure function ease(t: float) -> float {
+        return 1 - pow(1 - clamp(t, 0, 1), 3);
+    }
+    pure function glow(delay: float) -> float {
+        if root.still || root.elapsed < delay {
+            return 1;
+        }
+        return 1 - 0.28 * (0.5 - 0.5 * cos((root.elapsed - delay) / 3200 * 360deg));
+    }
+
+    Image { width: 100%; height: 100%; source: @image-url("logo/base.svg"); }
+    Reveal {
+        size: root.width;
+        source: @image-url("logo/beam.svg");
+        from: 114;
+        to: 464;
+        progress: root.ease(root.elapsed / 700);
+    }
+    Reveal {
+        size: root.width;
+        source: @image-url("logo/ray-vpn.svg");
+        from: 572;
+        to: 910;
+        progress: root.ease((root.elapsed - 500) / 600);
+        opacity: root.glow(1300);
+    }
+    Reveal {
+        size: root.width;
+        source: @image-url("logo/ray-direct.svg");
+        from: 572;
+        to: 910;
+        progress: root.ease((root.elapsed - 650) / 600);
+        opacity: root.glow(1600);
+    }
+    Image { width: 100%; height: 100%; source: @image-url("logo/prism.svg"); }
+}

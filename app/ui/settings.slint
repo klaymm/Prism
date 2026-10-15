@@ -1,0 +1,324 @@
+import { Theme } from "@prism/theme.slint";
+import { Icons } from "@prism/icons.slint";
+import { Badge, Button, ButtonKind, Card, Label, PageHeader, Segmented, Switch, TextField, Tone } from "@prism/controls.slint";
+import { Select, Tip } from "@prism/overlays.slint";
+import { App } from "globals.slint";
+
+component Section inherits VerticalLayout {
+    in property <string> title;
+    padding-bottom: 20px;
+    Label {
+        x: 4px;
+        text: root.title;
+        font-size: 12px;
+        line-height: 16px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        color: Theme.subtle-foreground;
+    }
+    Rectangle { height: 8px; }
+    Card {
+        VerticalLayout {
+            @children
+        }
+    }
+}
+
+component Divider inherits Rectangle {
+    height: 1px;
+    background: Theme.border;
+}
+
+component Row inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> text;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    spacing: 24px;
+    VerticalLayout {
+        horizontal-stretch: 1;
+        alignment: center;
+        Label { text: root.title; font-weight: 500; line-height: 20px; }
+        if root.text != "": Label {
+            text: root.text;
+            wrap: word-wrap;
+            font-size: 13px;
+            line-height: 21.5px;
+            vertical-alignment: bottom;
+            color: Theme.muted-foreground;
+        }
+    }
+    HorizontalLayout {
+        alignment: end;
+        VerticalLayout {
+            alignment: center;
+            @children
+        }
+    }
+}
+
+export component SettingField inherits TextField {
+    in property <string> key;
+    in property <string> value;
+    init => { self.text = root.value; }
+    changed value => { self.text = root.value; }
+    changed has-focus => {
+        if !self.has-focus && self.text != root.value {
+            App.set-setting(root.key, self.text);
+        }
+    }
+    accepted => { self.blur-input(); }
+}
+
+component SwitchRow inherits Row {
+    in property <string> key;
+    in property <bool> checked;
+    VerticalLayout {
+        alignment: start;
+        min-height: 27px;
+        Switch {
+            label: root.title;
+            checked: root.checked;
+            toggled(v) => { App.set-setting(root.key, v ? "true" : "false"); }
+        }
+    }
+}
+
+export component SettingsPage inherits HorizontalLayout {
+    alignment: start;
+    VerticalLayout {
+        horizontal-stretch: 1;
+        max-width: 768px;
+        alignment: start;
+        PageHeader { title: "Настройки"; }
+
+        Section {
+            title: "ВНЕШНИЙ ВИД";
+            Row {
+                title: "Тема";
+                Segmented {
+                    small: true;
+                    items: [
+                        { value: "system", label: "Система", icon: Icons.monitor },
+                        { value: "light", label: "Светлая", icon: Icons.sun },
+                        { value: "dark", label: "Тёмная", icon: Icons.moon },
+                    ];
+                    value: App.theme;
+                    changed(v) => { App.set-setting("theme", v); }
+                }
+            }
+        }
+
+        Section {
+            title: "ЗАПУСК";
+            SwitchRow {
+                title: "Запускать вместе с Windows";
+                text: App.tun && App.elevated ? "С TUN — через планировщик задач с правами администратора" : "Приложение стартует свёрнутым в трей";
+                key: "autostart";
+                checked: App.autostart;
+            }
+            Divider { }
+            SwitchRow {
+                title: "Подключаться при запуске";
+                key: "connectOnLaunch";
+                checked: App.connect-on-launch;
+            }
+            Divider { }
+            SwitchRow {
+                title: "Сворачивать в трей при закрытии";
+                text: "Иначе закрытие окна завершает приложение и отключает VPN";
+                key: "closeToTray";
+                checked: App.close-to-tray;
+            }
+        }
+
+        Section {
+            title: "ПОДКЛЮЧЕНИЕ";
+            Row {
+                title: "Порт SOCKS5";
+                SettingField { width: 112px; key: "socksPort"; value: App.socks-port; align: TextHorizontalAlignment.right; }
+            }
+            Divider { }
+            Row {
+                title: "Порт HTTP";
+                text: "На него указывает системный прокси";
+                SettingField { width: 112px; key: "httpPort"; value: App.http-port; align: TextHorizontalAlignment.right; }
+            }
+            Divider { }
+            SwitchRow {
+                title: "Доступ из локальной сети";
+                text: "Другие устройства смогут использовать прокси этого компьютера";
+                key: "allowLan";
+                checked: App.allow-lan;
+            }
+            Divider { }
+            Row {
+                title: "Подробность логов Xray";
+                Select {
+                    label: "Уровень логов";
+                    min-w: 144px;
+                    options: [
+                        { value: "error", label: "Только ошибки" },
+                        { value: "warning", label: "Предупреждения" },
+                        { value: "info", label: "Подробно" },
+                        { value: "debug", label: "Отладка" },
+                    ];
+                    value: App.log-level;
+                    changed(v) => { App.set-setting("logLevel", v); }
+                }
+            }
+        }
+
+        Section {
+            title: "РЕЖИМ TUN";
+            Row {
+                title: "Права администратора";
+                text: App.elevated
+                    ? "Приложение запущено от имени администратора — TUN доступен"
+                    : "TUN создаёт виртуальный адаптер, для этого нужны права администратора";
+                if App.elevated: Badge { text: "Есть"; icon: Icons.shield-check; tone: Tone.accent; }
+                if !App.elevated: Button {
+                    small: true;
+                    kind: ButtonKind.outline;
+                    text: "Перезапустить от администратора";
+                    clicked => { App.elevation-open = true; }
+                }
+            }
+            Divider { }
+            Row {
+                title: "Сетевой стек";
+                text: "mixed — рекомендуемый; gvisor — совместимее, system — быстрее";
+                Segmented {
+                    small: true;
+                    items: [
+                        { value: "mixed", label: "mixed" },
+                        { value: "system", label: "system" },
+                        { value: "gvisor", label: "gvisor" },
+                    ];
+                    value: App.tun-stack;
+                    changed(v) => { App.set-setting("tunStack", v); }
+                }
+            }
+            Divider { }
+            Row {
+                title: "MTU";
+                SettingField { width: 112px; key: "tunMtu"; value: App.tun-mtu; align: TextHorizontalAlignment.right; }
+            }
+        }
+
+        Section {
+            title: "ПОДПИСКИ И РОУТИНГ";
+            Row {
+                title: "User-Agent подписки";
+                text: "Некоторые панели отдают разный формат в зависимости от клиента";
+                SettingField { width: 224px; key: "userAgent"; value: App.user-agent; }
+            }
+            Divider { }
+            VerticalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                padding-top: 14px;
+                padding-bottom: 14px;
+                Label { text: "Источник правил «Всё, кроме РФ»"; font-weight: 500; line-height: 20px; }
+                Label {
+                    text: "Deeplink профиля роутинга в формате Happ";
+                    font-size: 13px;
+                    color: Theme.muted-foreground;
+                }
+                HorizontalLayout {
+                    padding-top: 8px;
+                    spacing: 8px;
+                    SettingField {
+                        horizontal-stretch: 1;
+                        key: "routingUrl";
+                        value: App.routing-url;
+                        mono: true;
+                        font-size: 12px;
+                    }
+                    Tip {
+                        tip: "По умолчанию";
+                        width: 36px;
+                        height: 36px;
+                        Button {
+                            label: "Вернуть источник по умолчанию";
+                            square: true;
+                            kind: ButtonKind.outline;
+                            icon: Icons.rotate-ccw;
+                            enabled: !App.routing-url-default;
+                            clicked => { App.set-setting("routingUrl", "https://raw.githubusercontent.com/hydraponique/roscomvpn-routing/refs/heads/main/HAPP/DEFAULT.DEEPLINK"); }
+                        }
+                    }
+                }
+            }
+        }
+
+        Section {
+            title: "О ПРОГРАММЕ";
+            Row {
+                title: "Prism " + App.version;
+                text: App.cores-text;
+                Tip {
+                    tip: App.data-dir;
+                    Button {
+                        small: true;
+                        kind: ButtonKind.outline;
+                        text: "Папка данных";
+                        icon: Icons.folder-open;
+                        clicked => { App.open-data-dir(); }
+                    }
+                }
+            }
+            Divider { }
+            Row {
+                title: "Обновления";
+                text: App.update-text;
+                HorizontalLayout {
+                    spacing: 8px;
+                    if App.update-available && App.has-release-page: Button {
+                        small: true;
+                        kind: ButtonKind.ghost;
+                        text: "Что нового";
+                        clicked => { App.open-release-page(); }
+                    }
+                    if App.update-available: Button {
+                        small: true;
+                        kind: ButtonKind.primary;
+                        text: "Обновить до " + App.update-version;
+                        icon: Icons.download;
+                        loading: App.update-busy;
+                        clicked => { App.install-update(); }
+                    }
+                    if !App.update-available: Button {
+                        small: true;
+                        kind: ButtonKind.outline;
+                        text: "Проверить";
+                        icon: Icons.refresh-cw;
+                        loading: App.update-busy;
+                        clicked => { App.check-update(); }
+                    }
+                }
+            }
+            Divider { }
+            SwitchRow {
+                title: "Обновлять автоматически";
+                text: "Новая версия ставится сама при запуске Prism";
+                key: "autoUpdate";
+                checked: App.auto-update;
+            }
+            Divider { }
+            Row {
+                title: "Выйти из приложения";
+                text: "Отключает VPN и возвращает прежние настройки прокси";
+                Button {
+                    small: true;
+                    kind: ButtonKind.outline;
+                    text: "Выход";
+                    icon: Icons.log-out;
+                    clicked => { App.quit(); }
+                }
+            }
+        }
+    }
+}
